@@ -140,6 +140,50 @@ Both edge conditions read a value computed in Python, not text a model wrote.
 
 
 
+## Install it once, then forget it
+
+```bash
+pip install -e .
+journeyman install --repo ~/work/your-repo --every 180
+```
+
+That writes a launchd agent. It wakes every three hours, works one item from
+the queue, leaves a branch, and records what it did. `journeyman status` tells
+you whether it is running and what it has been up to. `journeyman uninstall`
+removes it and leaves your branches and records alone.
+
+Three deliberate choices in that agent, all asserted in tests:
+
+- `RunAtLoad: false` — installing it does not start it editing your code that second
+- `ProcessType: Background`, `Nice 5`, low-priority IO — it yields to whatever you are doing
+- it calls `run-scheduled`, which is the same `watch` you can run by hand
+
+Everything lives in `~/.journeyman`: one memory across every repo, one folder of
+shift records, the service logs.
+
+## The three brains
+
+| | model | where | when |
+|---|---|---|---|
+| **local** | Qwen3-Coder 30B-A3B (~17 GB at Q4) | your laptop, via Ollama | everything routine. Free, private, works on a plane |
+| **bedrock** | Claude on Amazon Bedrock | your AWS account | when the work is on AWS anyway: credentials are already there, traffic stays in the account, usage lands on the same bill |
+| **heavy** | [Kimi K3](https://github.com/MoonshotAI/Kimi-K3), 2.8T params, 1M context | an OpenAI-compatible endpoint | when the task needs the whole repo in view |
+
+```bash
+ollama pull qwen3-coder:30b      # local
+aws configure                    # bedrock
+export OPENROUTER_API_KEY=...    # heavy
+journeyman brain                 # what is actually available
+JOURNEYMAN_PREFER=bedrock journeyman shift
+```
+
+It degrades rather than failing: with only one configured it uses that one and
+says so in the report.
+
+**Kimi K3 cannot run on a laptop.** At MXFP4 the weights are on the order of a
+terabyte against 24 GB of RAM. Using it through an API is still using an
+open-weight model: auditable, self-hostable on real hardware, provider-portable.
+
 ## It knows what AI engineering breaks
 
 A linter finds unused imports. It does not know that a prompt with no eval is a
@@ -161,6 +205,10 @@ with the reason they would give and the fix they would suggest.
 | **AIE007** | a test that calls a live model with no temperature or seed |
 | **AIE008** | a prompt with no eval. Nothing measures it, so nothing can go red |
 | **AIE009** | model calls inside a loop with no usage accounting |
+| **AIE010** | Bedrock client with no adaptive retry, and throttling is the normal case |
+| **AIE011** | `invoke_model` instead of `converse`, which locks the payload to one provider |
+| **AIE012** | Bedrock client with no `region_name`: model access is granted per region |
+| **AIE013** | user-facing Bedrock call with no guardrail attached |
 
 ```
   [85] AIE008  prompts/triage_prompt.txt is a prompt with no eval
@@ -212,6 +260,8 @@ Everything above is Journeyman doing a job you asked for. This part is it
 working the queue on its own.
 
 ```bash
+journeyman install --repo ~/work # live in the system, run on a schedule
+journeyman status                # is it running, what has it done
 journeyman review                # what an AI engineer would flag here
 journeyman scout                 # everything worth doing, ranked
 journeyman shift                 # take the top item, work it, report

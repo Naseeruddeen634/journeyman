@@ -48,7 +48,7 @@ LLM_MARKERS = re.compile(
     r"\b(openai|anthropic|bedrock|ollama|litellm|langchain|llama_index|llamaindex|"
     r"strands|mistral|cohere|together|groq|huggingface|transformers|"
     r"chat\.completions|messages\.create|invoke_model|generate_content|"
-    r"ChatPromptTemplate|system_prompt|completion\()",
+    r"ChatPromptTemplate|system_prompt|completion\(|bedrock-runtime|converse)",
     re.I,
 )
 
@@ -333,10 +333,133 @@ def check_untracked_cost(path: Path, text: str, tree: ast.AST, rel: str) -> list
     return out
 
 
+
+
+# ---------------------------------------------------------- AWS / Bedrock
+
+BEDROCK_CLIENT = re.compile(
+    r"""(?:boto3|session)\s*\.\s*(?:client|resource)\s*\(\s*["']bedrock[\w\-]*["']""",
+    re.X,
+)
+
+
+def _has_bedrock(text: str) -> bool:
+    return bool(BEDROCK_CLIENT.search(text) or re.search(r"bedrock[-_]?runtime", text, re.I))
+
+
+def check_bedrock_no_adaptive_retry(path: Path, text: str, tree: ast.AST, rel: str) -> list[Finding]:
+    """AIE010. Bedrock throttles, and boto3's default retry is not built for it."""
+    if not _has_bedrock(text):
+        return []
+    if re.search(r"(adaptive|standard)", text) and re.search(r"retries\s*=|max_attempts", text):
+        return []
+    m = BEDROCK_CLIENT.search(text)
+    line = text[: m.start()].count("\n") + 1 if m else 1
+    return [Finding(
+        code="AIE010",
+        title="Bedrock client with no adaptive retry configured",
+        why=("ThrottlingException is the normal Bedrock failure, not the exceptional "
+             "one, especially on on-demand throughput at peak. boto3's default retry "
+             "mode is 'legacy': a few attempts with backoff that was not designed for "
+             "a service that throttles this hard. The symptom is intermittent 500s "
+             "from your own API that never reproduce locally."),
+        fix=("Pass a Config explicitly:\n"
+             "    from botocore.config import Config\n"
+             "    cfg = Config(retries={'max_attempts': 10, 'mode': 'adaptive'},\n"
+             "                 read_timeout=120, connect_timeout=10)\n"
+             "    boto3.client('bedrock-runtime', config=cfg)\n"
+             "Adaptive mode adds client-side rate limiting, which is what you want "
+             "when the whole fleet is being throttled at once."),
+        where=f"{rel}:{line}", severity=80,
+    )]
+
+
+def check_invoke_model_over_converse(path: Path, text: str, tree: ast.AST, rel: str) -> list[Finding]:
+    """AIE011. invoke_model locks the payload shape to one provider."""
+    out = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or _call_name(node).split(".")[-1] != "invoke_model":
+            continue
+        out.append(Finding(
+            code="AIE011",
+            title="invoke_model instead of converse",
+            why=("invoke_model takes a raw body whose schema belongs to one provider. "
+                 "Anthropic wants anthropic_version and max_tokens, Titan wants "
+                 "inputText and textGenerationConfig, Llama wants something else "
+                 "again. Changing model means rewriting the payload, the parsing and "
+                 "the tests, which is exactly the migration you will want to do "
+                 "cheaply when a cheaper model lands."),
+            fix=("Use converse(). It takes one message shape across every model on "
+                 "Bedrock and returns one response shape, so switching model is a "
+                 "config change. Keep invoke_model only for provider features "
+                 "converse does not expose yet."),
+            where=f"{rel}:{node.lineno}", severity=55,
+        ))
+        break
+    return out
+
+
+def check_bedrock_region_not_pinned(path: Path, text: str, tree: ast.AST, rel: str) -> list[Finding]:
+    """AIE012. Model availability is regional. This works locally and 404s in prod."""
+    if not _has_bedrock(text):
+        return []
+    m = BEDROCK_CLIENT.search(text)
+    if not m:
+        return []
+    window = text[m.start(): m.start() + 400]
+    if re.search(r"region_name\s*=", window):
+        return []
+    line = text[: m.start()].count("\n") + 1
+    return [Finding(
+        code="AIE012",
+        title="Bedrock client with no region_name",
+        why=("The region then comes from whatever AWS_REGION or profile the process "
+             "happens to inherit. Model access on Bedrock is granted per region, so "
+             "the same code reaches the model on your laptop and returns "
+             "AccessDeniedException or ValidationException in the environment that "
+             "inherited a different default."),
+        fix=("Pass region_name explicitly from configuration, and fail at startup if "
+             "it is unset rather than at the first call."),
+        where=f"{rel}:{line}", severity=70,
+    )]
+
+
+def check_no_bedrock_guardrail(path: Path, text: str, tree: ast.AST, rel: str) -> list[Finding]:
+    """AIE013. User-facing generation on Bedrock with no guardrail attached."""
+    if not _has_bedrock(text):
+        return []
+    if re.search(r"guardrail", text, re.I):
+        return []
+    if not re.search(r"(user|customer|public|request|ticket|chat|reply)", text, re.I):
+        return []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and \
+                _call_name(node).split(".")[-1] in ("converse", "invoke_model",
+                                                    "converse_stream",
+                                                    "invoke_model_with_response_stream"):
+            return [Finding(
+                code="AIE013",
+                title="user-facing Bedrock call with no guardrail",
+                why=("Nothing is filtering what goes in or what comes back. Bedrock "
+                     "Guardrails exist for exactly this and are configured per call, "
+                     "so leaving them off is a decision rather than a default. On a "
+                     "path that takes public input this is the control an auditor "
+                     "will ask about first."),
+                fix=("Create a guardrail in the Bedrock console, then pass "
+                     "guardrailIdentifier and guardrailVersion on the call. Start it "
+                     "in DRAFT and look at what it would have blocked before you "
+                     "enforce it."),
+                where=f"{rel}:{node.lineno}", severity=75,
+            )]
+    return []
+
+
 FILE_CHECKS = [
     check_hardcoded_model_ids, check_unbounded_output, check_unvalidated_parsing,
     check_prompt_injection_surface, check_no_retry_or_timeout, check_swallowed_errors,
     check_nondeterministic_tests, check_untracked_cost,
+    check_bedrock_no_adaptive_retry, check_invoke_model_over_converse,
+    check_bedrock_region_not_pinned, check_no_bedrock_guardrail,
 ]
 
 

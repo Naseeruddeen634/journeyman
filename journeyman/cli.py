@@ -16,7 +16,15 @@ from .memory.store import Memory
 from .report import render, render_markdown
 from .session import Job
 
+from .home import HOME, MEMORY, ensure, history, load_config, record_shift, save_config
+
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _default_memory(arg: str | None) -> str:
+    """Memory lives in ~/.journeyman by default, not next to the source."""
+    ensure()
+    return arg or str(MEMORY)
 
 
 def _build(args) -> int:
@@ -25,7 +33,7 @@ def _build(args) -> int:
         print(f"No corpus at {corpus_path}. Run: python demo/generate.py", file=sys.stderr)
         return 2
     corpus = json.loads(corpus_path.read_text(encoding="utf8"))
-    memory = Memory(args.memory) if args.memory else Memory()
+    memory = Memory(_default_memory(args.memory))
     outdir = Path(args.out)
 
     job = Job(goal=args.goal, max_generations=args.max_generations)
@@ -48,7 +56,7 @@ def _build(args) -> int:
 
 
 def _memory(args) -> int:
-    memory = Memory(args.memory) if args.memory else Memory()
+    memory = Memory(_default_memory(args.memory))
     st = memory.stats()
     print(f"\n  {memory.path}")
     print(f"  {st['episodes']} job(s), {st['lessons']} lesson(s), "
@@ -64,7 +72,7 @@ def _memory(args) -> int:
 
 
 def _forget(args) -> int:
-    memory = Memory(args.memory) if args.memory else Memory()
+    memory = Memory(_default_memory(args.memory))
     n = len(memory.episodes)
     memory.episodes = []
     memory.save()
@@ -169,12 +177,98 @@ def _watch(args) -> int:
     return 0
 
 
+def _install(args) -> int:
+    """Put it in the system so it runs without being asked."""
+    from . import service
+
+    repos = [str(Path(r).resolve()) for r in (args.repo or [])]
+    if not repos:
+        print("\n  Name at least one repo: journeyman install --repo ~/work/thing\n",
+              file=sys.stderr)
+        return 2
+    bad = [r for r in repos if not (Path(r) / ".git").exists()]
+    if bad:
+        print(f"\n  Not a git repository: {bad[0]}\n", file=sys.stderr)
+        return 2
+
+    cfg = load_config()
+    cfg["repos"] = repos
+    save_config(cfg)
+
+    plist = service.write_plist(repos, every_minutes=args.every, max_shifts=args.max_shifts)
+    print(f"\n  Wrote {plist}")
+    print(f"  Wakes every {args.every} min, up to {args.max_shifts} shift(s) each time.")
+    print(f"  Repos: {', '.join(repos)}")
+
+    if args.no_start:
+        print(f"\n  Not started. When you want it:  launchctl load -w {plist}\n")
+        return 0
+    ok, msg = service.load()
+    print(f"\n  {'Running.' if ok else 'Could not start: ' + msg}")
+    print("  It creates branches. It never pushes, merges, or touches your checkout.")
+    print("  Stop it any time:  journeyman uninstall\n")
+    return 0 if ok else 1
+
+
+def _uninstall(args) -> int:
+    from . import service
+    print(f"\n  {service.uninstall()}\n")
+    return 0
+
+
+def _status(args) -> int:
+    from . import service
+
+    st = service.status()
+    print()
+    print(f"  installed  {'yes' if st['installed'] else 'no'}")
+    print(f"  running    {'yes' if st['running'] else 'no'}")
+    print(f"  home       {st['home']}")
+    for r in st["repos"]:
+        print(f"  watching   {r}")
+    runs = history(limit=args.limit)
+    print(f"\n  {len(runs)} recent shift(s):\n" if runs else "\n  No shifts yet.\n")
+    for h in runs:
+        t = (h.get("task") or {}).get("title", "-")
+        print(f"    {h.get('outcome','?'):<20} {t[:46]}")
+        if h.get("branch"):
+            print(f"    {'':<20} {h['branch']}")
+    print()
+    return 0
+
+
+def _run_scheduled(args) -> int:
+    """What launchd calls. Quiet unless something happened."""
+    import time as _t
+
+    from .autonomy.watch import morning_report, stand_watch
+
+    cfg = load_config()
+    repos = [str(Path(r).resolve()) for r in (args.repo or cfg.get("repos", []))]
+    print(f"\n=== {_t.strftime('%Y-%m-%d %H:%M')} ===", flush=True)
+    for repo in repos:
+        if not Path(repo).exists():
+            print(f"  {repo}: gone, skipping", flush=True)
+            continue
+        log = stand_watch(repo, max_shifts=args.max_shifts, max_hours=1.0, interval_s=5)
+        for s in log.shifts:
+            record_shift(repo, s.to_dict())
+        if log.shifts:
+            print(f"  {repo}", flush=True)
+            print(morning_report(log), flush=True)
+        else:
+            print(f"  {repo}: nothing to do", flush=True)
+    return 0
+
+
 def _brain(args) -> int:
     from .brain.models import check
     st = check()
     print()
-    print(f"  local   {st.local_model:<28} {'ready' if st.local_available else 'MISSING'}")
-    print(f"  heavy   {st.heavy_model:<28} {'ready' if st.heavy_available else 'not configured'}")
+    print(f"  local    {st.local_model:<30} {'ready' if st.local_available else 'MISSING'}")
+    print(f"  heavy    {st.heavy_model:<30} {'ready' if st.heavy_available else 'not configured'}")
+    print(f"  bedrock  {st.bedrock_model:<30} "
+          f"{'ready (' + st.bedrock_region + ')' if st.bedrock_available else 'not configured'}")
     if st.detail:
         print(f"\n  {st.detail}")
     if not st.heavy_available:
@@ -230,6 +324,25 @@ def main(argv: list[str] | None = None) -> int:
     w.add_argument("--max-hours", type=float, default=8.0)
     w.add_argument("--interval", type=float, default=60.0)
     w.set_defaults(func=_watch)
+
+    ins = sub.add_parser("install", help="run on a schedule, in the background")
+    ins.add_argument("--repo", action="append", help="repeatable")
+    ins.add_argument("--every", type=int, default=120, help="minutes between wakeups")
+    ins.add_argument("--max-shifts", type=int, default=2)
+    ins.add_argument("--no-start", action="store_true", help="write it but do not start it")
+    ins.set_defaults(func=_install)
+
+    un = sub.add_parser("uninstall", help="remove the scheduled agent")
+    un.set_defaults(func=_uninstall)
+
+    stt = sub.add_parser("status", help="is it running, and what has it done")
+    stt.add_argument("--limit", type=int, default=10)
+    stt.set_defaults(func=_status)
+
+    rs = sub.add_parser("run-scheduled", help="what the scheduler calls")
+    rs.add_argument("--repo", action="append")
+    rs.add_argument("--max-shifts", type=int, default=2)
+    rs.set_defaults(func=_run_scheduled)
 
     br = sub.add_parser("brain", help="which models are available")
     br.set_defaults(func=_brain)

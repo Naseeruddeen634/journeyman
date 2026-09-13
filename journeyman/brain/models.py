@@ -28,6 +28,8 @@ from dataclasses import dataclass
 
 
 LOCAL_MODEL = os.environ.get("JOURNEYMAN_LOCAL_MODEL", "qwen3-coder:30b")
+BEDROCK_MODEL = os.environ.get("JOURNEYMAN_BEDROCK_MODEL", "global.anthropic.claude-sonnet-4-6")
+BEDROCK_REGION = os.environ.get("AWS_REGION", "us-west-2")
 HEAVY_MODEL = os.environ.get("JOURNEYMAN_HEAVY_MODEL", "moonshotai/kimi-k3")
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 HEAVY_BASE_URL = os.environ.get("JOURNEYMAN_HEAVY_BASE_URL", "https://openrouter.ai/api/v1")
@@ -40,11 +42,15 @@ class BrainStatus:
     local_model: str
     heavy_available: bool
     heavy_model: str
+    bedrock_available: bool = False
+    bedrock_model: str = BEDROCK_MODEL
+    bedrock_region: str = BEDROCK_REGION
     detail: str = ""
 
     def summary(self) -> str:
         bits = [f"local {'ok' if self.local_available else 'MISSING'} ({self.local_model})",
-                f"heavy {'ok' if self.heavy_available else 'not configured'} ({self.heavy_model})"]
+                f"heavy {'ok' if self.heavy_available else 'off'}",
+                f"bedrock {'ok' if self.bedrock_available else 'off'}"]
         return " | ".join(bits) + (f"  {self.detail}" if self.detail else "")
 
 
@@ -78,6 +84,42 @@ def heavy_brain(temperature: float = 0.3, **kw):
     )
 
 
+def bedrock_brain(temperature: float = 0.2, **kw):
+    """Claude on Amazon Bedrock.
+
+    The right brain when the work is on AWS anyway: the credentials are already
+    there, the traffic stays inside the account, and usage lands on the same
+    bill as everything else. Requires model access to be granted in the region,
+    which is a console step people forget.
+    """
+    from strands.models import BedrockModel
+
+    return BedrockModel(
+        model_id=BEDROCK_MODEL,
+        region_name=BEDROCK_REGION,
+        temperature=temperature,
+        **kw,
+    )
+
+
+def _bedrock_ready() -> tuple[bool, str]:
+    """Credentials present and the region set. Does not spend a token to check."""
+    try:
+        import boto3
+    except ImportError:
+        return False, "boto3 not installed"
+    try:
+        session = boto3.Session()
+        if session.get_credentials() is None:
+            return False, "no AWS credentials found"
+        region = session.region_name or os.environ.get("AWS_REGION")
+        if not region:
+            return False, "AWS credentials found but no region set"
+        return True, ""
+    except Exception as exc:
+        return False, f"boto3 check failed: {type(exc).__name__}"
+
+
 def check() -> BrainStatus:
     """Preflight. Called before the agent is allowed to run unattended."""
     local_ok, detail = False, ""
@@ -92,12 +134,16 @@ def check() -> BrainStatus:
     except Exception as exc:
         detail = f"ollama unreachable at {OLLAMA_HOST}: {type(exc).__name__}"
 
+    bedrock_ok, bedrock_detail = _bedrock_ready()
     return BrainStatus(
         local_available=local_ok,
         local_model=LOCAL_MODEL,
         heavy_available=bool(os.environ.get(HEAVY_API_KEY_ENV)),
         heavy_model=HEAVY_MODEL,
-        detail=detail,
+        bedrock_available=bedrock_ok,
+        bedrock_model=BEDROCK_MODEL,
+        bedrock_region=BEDROCK_REGION,
+        detail=detail or (bedrock_detail if not bedrock_ok else ""),
     )
 
 
@@ -107,16 +153,26 @@ def pick(task_difficulty: str = "routine"):
     Returns (model, name, why).
     """
     status = check()
+    prefer = os.environ.get("JOURNEYMAN_PREFER", "local").lower()
+
+    if prefer == "bedrock" and status.bedrock_available:
+        return (bedrock_brain(), BEDROCK_MODEL,
+                f"JOURNEYMAN_PREFER=bedrock, running in {status.bedrock_region}")
     if task_difficulty == "hard" and status.heavy_available:
         return heavy_brain(), HEAVY_MODEL, "task marked hard and the heavy brain is configured"
+    if task_difficulty == "hard" and status.bedrock_available:
+        return (bedrock_brain(), BEDROCK_MODEL,
+                f"task marked hard, using Bedrock in {status.bedrock_region}")
     if status.local_available:
         why = "routine work" if task_difficulty != "hard" else (
             "task is hard but no heavy brain is configured, so the local model gets it"
         )
         return local_brain(), LOCAL_MODEL, why
+    if status.bedrock_available:
+        return bedrock_brain(), BEDROCK_MODEL, "no local model installed, falling back to Bedrock"
     if status.heavy_available:
         return heavy_brain(), HEAVY_MODEL, "no local model installed, falling back to the API"
     raise RuntimeError(
-        "No brain available. Either `ollama pull " + LOCAL_MODEL + "` or set "
-        + HEAVY_API_KEY_ENV + "."
+        "No brain available. Any one of: `ollama pull " + LOCAL_MODEL + "`, "
+        "set " + HEAVY_API_KEY_ENV + ", or configure AWS credentials with Bedrock access."
     )
