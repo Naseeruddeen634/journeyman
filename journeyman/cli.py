@@ -72,6 +72,92 @@ def _forget(args) -> int:
     return 0
 
 
+def _scout(args) -> int:
+    from .autonomy.scout import describe, survey
+    tasks = survey(args.repo)
+    print(f"\n  {describe(tasks)}\n")
+    for t in tasks[: args.limit]:
+        print(f"  [{t.priority:>3}] {t.kind:<14} {t.title[:60]}")
+        print(f"        {t.where}")
+    print()
+    return 0
+
+
+def _shift(args) -> int:
+    """One unattended shift: take the top task, work it, report."""
+    from .autonomy.guardrails import Budget
+    from .autonomy.shift import report, work_one
+    from .brain.models import check
+
+    status = check()
+    print(f"\n  Journeyman night shift")
+    print(f"  {status.summary()}\n")
+    if not (status.local_available or status.heavy_available):
+        print("  No brain available. Nothing will happen.\n", file=sys.stderr)
+        return 2
+
+    budget = Budget(
+        max_minutes=args.max_minutes,
+        max_files_changed=args.max_files,
+        max_commands=args.max_commands,
+        max_iterations=args.max_iterations,
+    )
+    result = work_one(args.repo, budget=budget, keep_worktree=not args.cleanup)
+    print(report(result))
+
+    outdir = Path(args.repo) / ".journeyman" / "shifts"
+    outdir.mkdir(parents=True, exist_ok=True)
+    stamp = __import__("time").strftime("%Y%m%d-%H%M%S")
+    (outdir / f"{stamp}.json").write_text(
+        json.dumps(result.to_dict(), indent=2, default=str), encoding="utf8")
+    print(f"  full record: {outdir / (stamp + '.json')}\n")
+    return 0 if result.outcome in ("fixed", "no_work") else 1
+
+
+def _watch(args) -> int:
+    """Stand watch: keep working the queue until it is empty or it stops helping."""
+    from .autonomy.shift import report
+    from .autonomy.watch import morning_report, stand_watch
+    from .brain.models import check
+
+    status = check()
+    print(f"\n  Journeyman standing watch on {args.repo}")
+    print(f"  {status.summary()}")
+    print(f"  up to {args.max_shifts} shifts over {args.max_hours}h, "
+          f"checking every {args.interval}s\n")
+    if not (status.local_available or status.heavy_available):
+        print("  No brain available.\n", file=sys.stderr)
+        return 2
+
+    log = stand_watch(
+        args.repo, max_shifts=args.max_shifts, max_hours=args.max_hours,
+        interval_s=args.interval,
+        on_shift=lambda r: print(report(r), flush=True),
+    )
+    print(morning_report(log))
+    outdir = Path(args.repo) / ".journeyman" / "watch"
+    outdir.mkdir(parents=True, exist_ok=True)
+    stamp = __import__("time").strftime("%Y%m%d-%H%M%S")
+    (outdir / f"{stamp}.json").write_text(
+        json.dumps(log.to_dict(), indent=2, default=str), encoding="utf8")
+    print(f"  full record: {outdir / (stamp + '.json')}\n")
+    return 0
+
+
+def _brain(args) -> int:
+    from .brain.models import check
+    st = check()
+    print()
+    print(f"  local   {st.local_model:<28} {'ready' if st.local_available else 'MISSING'}")
+    print(f"  heavy   {st.heavy_model:<28} {'ready' if st.heavy_available else 'not configured'}")
+    if st.detail:
+        print(f"\n  {st.detail}")
+    if not st.heavy_available:
+        print("  set OPENROUTER_API_KEY to enable Kimi K3 for the hard tasks")
+    print()
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="journeyman",
                                 description="An AI engineer that builds it, proves it, and remembers.")
@@ -92,6 +178,30 @@ def main(argv: list[str] | None = None) -> int:
     f = sub.add_parser("forget", help="clear memory and start cold")
     f.add_argument("--memory", default=None)
     f.set_defaults(func=_forget)
+
+    sc = sub.add_parser("scout", help="what is worth doing in this repo right now")
+    sc.add_argument("--repo", default=".")
+    sc.add_argument("--limit", type=int, default=12)
+    sc.set_defaults(func=_scout)
+
+    sh = sub.add_parser("shift", help="work one task unattended and report")
+    sh.add_argument("--repo", default=".")
+    sh.add_argument("--max-minutes", type=float, default=45.0)
+    sh.add_argument("--max-files", type=int, default=12)
+    sh.add_argument("--max-commands", type=int, default=120)
+    sh.add_argument("--max-iterations", type=int, default=8)
+    sh.add_argument("--cleanup", action="store_true", help="remove the worktree afterwards")
+    sh.set_defaults(func=_shift)
+
+    w = sub.add_parser("watch", help="stand watch and keep working the queue")
+    w.add_argument("--repo", default=".")
+    w.add_argument("--max-shifts", type=int, default=6)
+    w.add_argument("--max-hours", type=float, default=8.0)
+    w.add_argument("--interval", type=float, default=60.0)
+    w.set_defaults(func=_watch)
+
+    br = sub.add_parser("brain", help="which models are available")
+    br.set_defaults(func=_brain)
 
     args = p.parse_args(argv)
     return args.func(args)

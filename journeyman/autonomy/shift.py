@@ -1,0 +1,340 @@
+"""One shift of unattended work.
+
+A shift is: survey the repo, take the most important broken thing, work it in an
+isolated worktree until the tests pass or the budget runs out, commit to a
+branch, write a report, stop.
+
+It never touches your checkout, never pushes, never merges. You come back to a
+branch and a note. That is the whole contract, and it is enforced in
+`guardrails.py` rather than requested in a prompt.
+"""
+
+from __future__ import annotations
+
+import json
+import subprocess
+import time
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from strands import Agent, tool
+
+from ..brain.models import check as brain_check
+from ..brain.models import pick as pick_brain
+from .guardrails import Budget, Refused, Sandbox, close_sandbox, open_sandbox
+from .scout import Task, describe, survey
+
+SYSTEM = """You are an engineer working a night shift on a colleague's repository.
+
+You have one job, stated below. Work it and stop.
+
+How to work:
+- Read before you write. Use read_file on the files involved.
+- Make the smallest change that fixes the actual cause. Do not refactor
+  surrounding code, do not rename things, do not "improve" what you were not
+  asked about.
+- Never weaken a test to make it pass. If a test is failing because the code is
+  wrong, fix the code. If you genuinely believe the test is wrong, stop and say
+  so in your final message rather than editing it.
+- Run run_tests after each change. The task is done when the suite is green.
+- If you cannot fix it, say what you tried and what you think is going on. A
+  clear account of a failure is worth more than a guess that breaks something.
+
+You cannot push, merge, install packages, or touch anything outside this
+worktree. Do not try; the attempt will be refused and it wastes your budget.
+
+When the tests pass, reply with a one-line summary starting with DONE:.
+If you are giving up, reply with a one-line summary starting with STUCK:.
+"""
+
+
+@dataclass
+class ShiftResult:
+    task: Task | None
+    branch: str = ""
+    started: float = field(default_factory=time.time)
+    finished: float = 0.0
+    tests_before: str = ""
+    tests_after: str = ""
+    green: bool = False
+    files_changed: list[str] = field(default_factory=list)
+    diff: str = ""
+    commit: str = ""
+    summary: str = ""
+    outcome: str = "no_work"     # fixed | stuck | refused | no_work | error
+    brain: str = ""
+    log: list[str] = field(default_factory=list)
+    budget: dict = field(default_factory=dict)
+
+    @property
+    def minutes(self) -> float:
+        return round(((self.finished or time.time()) - self.started) / 60, 1)
+
+    def to_dict(self) -> dict:
+        return {
+            "task": self.task.to_dict() if self.task else None,
+            "branch": self.branch, "outcome": self.outcome, "green": self.green,
+            "files_changed": self.files_changed, "commit": self.commit,
+            "summary": self.summary, "brain": self.brain,
+            "minutes": self.minutes, "budget": self.budget,
+            "diff": self.diff[:8000], "log": self.log[-80:],
+        }
+
+
+def _tools_for(sandbox: Sandbox, result: ShiftResult):
+    """Tools bound to one sandbox. Every path goes through the guardrail."""
+
+    @tool
+    def read_file(path: str) -> str:
+        """Read a file from the repository.
+
+        Args:
+            path: Path relative to the repository root.
+
+        Returns:
+            The file contents with line numbers, or an error message.
+        """
+        try:
+            p = sandbox.resolve(path)
+            if not p.exists():
+                return f"{path} does not exist."
+            lines = p.read_text(encoding="utf8", errors="ignore").splitlines()
+            return "\n".join(f"{i:5d}  {l}" for i, l in enumerate(lines[:900], 1))
+        except Refused as exc:
+            return f"Refused: {exc}"
+        except OSError as exc:
+            return f"Could not read {path}: {exc}"
+
+    @tool
+    def write_file(path: str, content: str) -> str:
+        """Write a file, replacing it entirely.
+
+        Args:
+            path: Path relative to the repository root.
+            content: The complete new contents of the file.
+
+        Returns:
+            Confirmation, or the reason it was refused.
+        """
+        try:
+            sandbox.write(path, content)
+            return f"Wrote {path} ({len(content.splitlines())} lines)."
+        except Refused as exc:
+            result.log.append(f"REFUSED write {path}: {exc}")
+            return f"Refused: {exc}"
+        except OSError as exc:
+            return f"Could not write {path}: {exc}"
+
+    @tool
+    def list_files(subdir: str = ".") -> str:
+        """List Python files in the repository.
+
+        Args:
+            subdir: Directory to list, relative to the repository root.
+
+        Returns:
+            A newline-separated list of paths.
+        """
+        try:
+            base = sandbox.resolve(subdir)
+        except Refused as exc:
+            return f"Refused: {exc}"
+        out = []
+        for p in sorted(base.rglob("*.py")):
+            if any(x in p.parts for x in (".git", ".venv", "__pycache__", ".journeyman")):
+                continue
+            out.append(str(p.relative_to(sandbox.root)))
+        return "\n".join(out[:200]) or "(nothing)"
+
+    @tool
+    def run_tests(target: str = "") -> str:
+        """Run the test suite and return the result.
+
+        Args:
+            target: Optional test file or node id to run instead of everything.
+
+        Returns:
+            The tail of pytest's output, including failures.
+        """
+        from .scout import _interpreter
+
+        cmd = f"{_interpreter(sandbox.root)} -m pytest -q --no-header --tb=short"
+        if target:
+            cmd += f" {target}"
+        try:
+            r = sandbox.run(cmd, timeout=300)
+        except Refused as exc:
+            return f"Refused: {exc}"
+        except subprocess.TimeoutExpired:
+            return "The test run timed out after 300s."
+        out = (r.stdout + r.stderr)[-3500:]
+        result.tests_after = out
+        return out
+
+    @tool
+    def show_diff() -> str:
+        """Show what you have changed so far, as a unified diff.
+
+        Returns:
+            The current diff against the branch point.
+        """
+        try:
+            r = sandbox.run("git diff", timeout=60)
+        except Refused as exc:
+            return f"Refused: {exc}"
+        return (r.stdout or "(no changes yet)")[:6000]
+
+    return [read_file, write_file, list_files, run_tests, show_diff]
+
+
+def work_one(repo: str | Path, task: Task | None = None, budget: Budget | None = None,
+             difficulty: str = "routine", keep_worktree: bool = True) -> ShiftResult:
+    """Do one task, end to end, unattended."""
+    repo = Path(repo).resolve()
+    budget = budget or Budget()
+
+    if task is None:
+        queue = survey(repo)
+        task = queue[0] if queue else None
+    if task is None:
+        return ShiftResult(task=None, outcome="no_work",
+                           summary="Nothing to do. Tests pass and the backlog is empty.")
+
+    result = ShiftResult(task=task)
+    stamp = time.strftime("%Y%m%d-%H%M")
+    slug = "".join(c if c.isalnum() else "-" for c in task.title.lower())[:40].strip("-")
+    branch = f"journeyman/{stamp}-{slug or task.kind}"
+
+    try:
+        sandbox = open_sandbox(repo, branch, budget)
+    except Refused as exc:
+        result.outcome, result.summary = "refused", str(exc)
+        result.finished = time.time()
+        return result
+    result.branch = branch
+
+    try:
+        model, name, why = pick_brain("hard" if task.priority >= 100 else difficulty)
+        result.brain = f"{name} ({why})"
+    except RuntimeError as exc:
+        result.outcome, result.summary = "refused", str(exc)
+        result.finished = time.time()
+        return result
+
+    brief = (
+        f"TASK ({task.kind}, priority {task.priority})\n"
+        f"{task.title}\n\n"
+        f"{task.detail}\n\n"
+        f"Where: {task.where}\n"
+    )
+    if task.evidence:
+        brief += f"\nEvidence:\n{task.evidence[:2500]}\n"
+
+    agent = Agent(
+        name="journeyman-night-shift",
+        system_prompt=SYSTEM,
+        tools=_tools_for(sandbox, result),
+        model=model,
+        callback_handler=None,
+    )
+
+    try:
+        response = agent(brief)
+        result.summary = str(response)[-600:].strip()
+    except Refused as exc:
+        result.outcome, result.summary = "refused", str(exc)
+    except Exception as exc:
+        result.outcome = "error"
+        result.summary = f"{type(exc).__name__}: {exc}"
+
+    # ---- verify for ourselves. The agent's own claim is not evidence. ----
+    from .scout import _interpreter
+
+    try:
+        verify = subprocess.run(
+            [_interpreter(sandbox.root), "-m", "pytest", "-q", "--no-header", "--tb=line"],
+            cwd=sandbox.root, capture_output=True, text=True, timeout=300)
+        result.tests_after = (verify.stdout + verify.stderr)[-2500:]
+        result.green = verify.returncode == 0
+    except (subprocess.TimeoutExpired, OSError) as exc:
+        result.tests_after = f"verification run failed: {exc}"
+        result.green = False
+
+    result.files_changed = sandbox.changed_files()
+    result.diff = sandbox.run("git diff").stdout if result.files_changed else ""
+    result.log = sandbox.log
+    result.budget = budget.to_dict()
+
+    if result.outcome not in ("refused", "error"):
+        if result.green and result.files_changed:
+            result.outcome = "fixed"
+        elif not result.files_changed:
+            result.outcome = "stuck"
+            result.summary = result.summary or "Made no changes."
+        else:
+            result.outcome = "stuck"
+
+    # commit only what survived verification
+    if result.outcome == "fixed":
+        if len(result.files_changed) > budget.max_files_changed:
+            result.outcome = "refused"
+            result.summary = (f"Changed {len(result.files_changed)} files, over the limit of "
+                              f"{budget.max_files_changed}. Left uncommitted for review.")
+        else:
+            sandbox.run("git add -A")
+            msg = f"{task.title[:68]}\n\nWorked unattended by Journeyman on {stamp}.\nTask: {task.kind} at {task.where}\n"
+            (sandbox.root / ".git_commit_msg").write_text(msg, encoding="utf8")
+            sandbox.run("git commit -F .git_commit_msg")
+            (sandbox.root / ".git_commit_msg").unlink(missing_ok=True)
+            result.commit = sandbox.run("git rev-parse --short HEAD").stdout.strip()
+
+    result.finished = time.time()
+    close_sandbox(repo, sandbox, keep=keep_worktree)
+    return result
+
+
+def report(result: ShiftResult) -> str:
+    """What you read in the morning."""
+    icon = {"fixed": "FIXED", "stuck": "STUCK", "refused": "REFUSED",
+            "no_work": "NOTHING TO DO", "error": "ERROR"}[result.outcome]
+    lines = ["", "=" * 72]
+    if result.task:
+        lines.append(f"  {icon}   {result.task.title[:58]}")
+        lines.append(f"          {result.task.where}")
+    else:
+        lines.append(f"  {icon}")
+    lines.append("=" * 72)
+    lines.append("")
+    if result.brain:
+        lines.append(f"  brain     {result.brain}")
+    if result.branch:
+        lines.append(f"  branch    {result.branch}")
+    if result.commit:
+        lines.append(f"  commit    {result.commit}")
+    lines.append(f"  tests     {'green' if result.green else 'still failing'}")
+    lines.append(f"  took      {result.minutes} min")
+    if result.budget:
+        b = result.budget
+        lines.append(f"  budget    {b['commands_run']}/{b['max_commands']} commands, "
+                     f"{b['heavy_calls']}/{b['max_heavy_calls']} heavy calls")
+    lines.append("")
+    if result.files_changed:
+        lines.append("  changed:")
+        for f in result.files_changed[:12]:
+            lines.append(f"    {f}")
+        lines.append("")
+    if result.summary:
+        lines.append("  what it says:")
+        for l in result.summary.splitlines()[-8:]:
+            lines.append(f"    {l[:68]}")
+        lines.append("")
+    refused = [l for l in result.log if l.startswith("REFUSED")]
+    if refused:
+        lines.append("  refused during the shift:")
+        for l in refused[:5]:
+            lines.append(f"    {l[:68]}")
+        lines.append("")
+    if result.outcome == "fixed":
+        lines.append(f"  Review it:  git diff main..{result.branch}")
+    lines.append("")
+    return "\n".join(lines)
