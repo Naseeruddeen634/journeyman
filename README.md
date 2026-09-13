@@ -138,9 +138,117 @@ intake -> architect -> recall -> harness -> prove
 
 Both edge conditions read a value computed in Python, not text a model wrote.
 
+
+## It works when you are not there
+
+Everything above is Journeyman doing a job you asked for. This part is it
+working the queue on its own.
+
+```bash
+journeyman scout                 # what is worth doing in this repo right now
+journeyman shift                 # take the top item, work it, report
+journeyman watch --max-shifts 6  # keep going until the queue is empty
+```
+
+A shift is: survey the repo, take the most important broken thing, work it in an
+isolated git worktree until the tests pass, commit to a branch, write a report,
+stop. You come back to a branch and a note.
+
+```
+  FIXED   failed: test_twenty_five_percent_off_eighty
+          tests/test_invoices.py
+
+  brain     qwen3-coder:30b
+  branch    journeyman/20260913-1513-failed--test-twenty-five-percent-off-eig
+  commit    bfbe21d
+  tests     green
+  took      0.4 min
+  budget    2/120 commands, 0/6 heavy calls
+
+  changed:
+    billing/invoices.py
+
+  Review it:  git diff main..journeyman/20260913-1513-...
+```
+
+That run is real. Two genuine bugs, fixed on the local model, in 24 seconds:
+
+```diff
+-    return round(amount - percent, 2)
++    return round(amount - (amount * percent / 100), 2)
+
+-    share = round(total / people, 2)
+-    return [share] * people
++    share = total / people
++    parts = [round(share, 2)] * (people - 1)
++    # Add the last part which makes up for any rounding difference
++    parts.append(round(total - sum(parts), 2))
++    return parts
+```
+
+It did not touch the tests. That is not luck, it is checked: the shift re-runs
+the suite itself afterwards rather than believing the agent's claim, and the
+commit only happens if that independent run is green.
+
+### It proposes, you dispose
+
+The contract, enforced in `guardrails.py` rather than requested in a prompt:
+
+| | |
+|---|---|
+| Works in | a throwaway `git worktree` on a new branch |
+| Never touches | your checkout, your branch, your stash |
+| Never runs | `push`, `merge`, `reset`, `rebase`, `rm -rf`, `sudo`, `pip install`, anything piping a download into a shell |
+| Cannot write | outside the sandbox, or to `.env`, `.pem`, `.key` |
+| Stops at | 45 min, 12 files, 120 commands, 8 iterations, 6 paid-model calls |
+| Stands down when | two consecutive shifts change nothing |
+| Leaves you | a branch, a diff, and a report |
+
+Every one of those refusals is a test. `test_autonomy.py` asserts that
+`git push --force`, `rm -rf ~/Documents`, `curl … | sh`, `pip install`,
+`chmod 777`, and working on `main` are all refused, and that the user's checkout
+is byte-for-byte unchanged after a shift writes to the same file.
+
+### How it finds work without being asked
+
+`scout.py` is deterministic inspection. No model decides what is broken, so the
+queue is auditable and identical on any machine.
+
+| priority | source |
+|---|---|
+| 100 | failing tests, run with the project's own interpreter |
+| 80 | unchecked boxes in `BACKLOG.md` |
+| 60 / 40 | `FIXME` / `TODO` comments with actual text |
+| 25 | public functions whose name appears nowhere in the tests |
+
+## The brains
+
+Two, because one is not enough and three is fuss.
+
+| | model | where | when |
+|---|---|---|---|
+| **local** | Qwen3-Coder 30B-A3B (MoE, ~17 GB at Q4) | your laptop, via Ollama | everything routine. Free, private, works on a plane |
+| **heavy** | [Kimi K3](https://github.com/MoonshotAI/Kimi-K3) (2.8T params, 1M context) | an OpenAI-compatible endpoint | when the local model is out of its depth, or the task needs the whole repo in view |
+
+```bash
+ollama pull qwen3-coder:30b            # the local brain
+export OPENROUTER_API_KEY=...          # optional: enables Kimi K3
+journeyman brain                       # check what is available
+```
+
+**On running Kimi K3 locally: you cannot.** At MXFP4 the weights are on the
+order of a terabyte. A 24 GB laptop is off by roughly two orders of magnitude.
+Using it through an API is still using an open-weight model, you can audit it,
+self-host it on real hardware, and change provider without changing the code.
+`brain/models.py` says this in the docstring so nobody discovers it at 2am.
+
+Escalation is explicit and metered. The agent asks for the heavy brain, the
+reason is written to the report, and the call budget is a hard stop. With no key
+set, it does the whole job on the local model and says so.
+
 ## Run it
 
-Python 3.10+. **No AWS account needed.**
+Python 3.10+. **No AWS account needed, and no API key needed either.**
 
 ```bash
 git clone https://github.com/Naseeruddeen634/journeyman && cd journeyman
@@ -155,6 +263,11 @@ python -m venv .venv && .venv/bin/pip install -r requirements.txt
   "pull supplier, date and amount total out of messy purchase orders and prove it works"
 
 .venv/bin/python -m journeyman.cli memory      # what it has learned
+
+# and the unattended side
+ollama pull qwen3-coder:30b
+.venv/bin/python -m journeyman.cli scout
+.venv/bin/python -m journeyman.cli shift
 ```
 
 Run the second command and watch the candidate count drop from 9 to 3.
@@ -204,8 +317,16 @@ common case where you have neither.
 It evolves a Python artifact against a deterministic grader. It does not yet
 optimise free-text prompts graded by a model, it will not rescue a task with no
 checkable notion of correct, and the pattern library is a fixed set of twelve
-architectures rather than anything open-ended. The honest summary: it does one
-kind of engineering job properly rather than every kind badly.
+architectures rather than anything open-ended.
+
+On the unattended side: it fixes the kind of bug a failing test pins down
+precisely. It is not going to design your service. Work it cannot do comes back
+as `STUCK` with an account of what it tried, which is the correct outcome and
+happens regularly. It reads Python; other languages are a scout change away but
+are not there today.
+
+The honest summary: it does a few kinds of engineering job properly rather than
+every kind badly, and it tells you which is which.
 
 ## Licence
 

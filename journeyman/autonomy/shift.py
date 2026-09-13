@@ -12,6 +12,7 @@ branch and a note. That is the whole contract, and it is enforced in
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import time
 from dataclasses import dataclass, field
@@ -48,6 +49,31 @@ If you are giving up, reply with a one-line summary starting with STUCK:.
 """
 
 
+# Hedges an engineer uses when they know the change is not quite right. A green
+# test suite is not proof of correctness: a model can satisfy an assertion by
+# deleting the behaviour the assertion was guarding. When it says so, that has
+# to reach the top of the report rather than the bottom of a log.
+DOUBT = (
+    "mismatch", "however", "but this", "not ideal", "contradic", "inconsistent",
+    "may not be", "might not be", "unclear", "assumption", "i assumed",
+    "does not match the docstring", "conflicts with", "arguably", "trade-off",
+    "tradeoff", "not sure", "unsure", "questionable",
+)
+
+
+def find_concerns(summary: str) -> list[str]:
+    """Sentences where the agent hedged about its own change."""
+    out = []
+    for raw in re.split(r"(?<=[.!?])\s+|\n", summary or ""):
+        line = raw.strip()
+        if len(line) < 12:
+            continue
+        low = line.lower()
+        if any(d in low for d in DOUBT):
+            out.append(line[:220])
+    return out[:4]
+
+
 @dataclass
 class ShiftResult:
     task: Task | None
@@ -61,7 +87,8 @@ class ShiftResult:
     diff: str = ""
     commit: str = ""
     summary: str = ""
-    outcome: str = "no_work"     # fixed | stuck | refused | no_work | error
+    outcome: str = "no_work"     # fixed | fixed_with_concerns | stuck | refused | no_work | error
+    concerns: list[str] = field(default_factory=list)
     brain: str = ""
     log: list[str] = field(default_factory=list)
     budget: dict = field(default_factory=dict)
@@ -75,7 +102,7 @@ class ShiftResult:
             "task": self.task.to_dict() if self.task else None,
             "branch": self.branch, "outcome": self.outcome, "green": self.green,
             "files_changed": self.files_changed, "commit": self.commit,
-            "summary": self.summary, "brain": self.brain,
+            "summary": self.summary, "brain": self.brain, "concerns": self.concerns,
             "minutes": self.minutes, "budget": self.budget,
             "diff": self.diff[:8000], "log": self.log[-80:],
         }
@@ -265,9 +292,12 @@ def work_one(repo: str | Path, task: Task | None = None, budget: Budget | None =
     result.log = sandbox.log
     result.budget = budget.to_dict()
 
+    result.concerns = find_concerns(result.summary)
+
     if result.outcome not in ("refused", "error"):
         if result.green and result.files_changed:
-            result.outcome = "fixed"
+            # Green is necessary, not sufficient. If it hedged, say so loudly.
+            result.outcome = "fixed_with_concerns" if result.concerns else "fixed"
         elif not result.files_changed:
             result.outcome = "stuck"
             result.summary = result.summary or "Made no changes."
@@ -275,7 +305,7 @@ def work_one(repo: str | Path, task: Task | None = None, budget: Budget | None =
             result.outcome = "stuck"
 
     # commit only what survived verification
-    if result.outcome == "fixed":
+    if result.outcome in ("fixed", "fixed_with_concerns"):
         if len(result.files_changed) > budget.max_files_changed:
             result.outcome = "refused"
             result.summary = (f"Changed {len(result.files_changed)} files, over the limit of "
@@ -295,7 +325,8 @@ def work_one(repo: str | Path, task: Task | None = None, budget: Budget | None =
 
 def report(result: ShiftResult) -> str:
     """What you read in the morning."""
-    icon = {"fixed": "FIXED", "stuck": "STUCK", "refused": "REFUSED",
+    icon = {"fixed": "FIXED", "fixed_with_concerns": "FIXED, BUT READ THIS",
+            "stuck": "STUCK", "refused": "REFUSED",
             "no_work": "NOTHING TO DO", "error": "ERROR"}[result.outcome]
     lines = ["", "=" * 72]
     if result.task:
@@ -323,6 +354,11 @@ def report(result: ShiftResult) -> str:
         for f in result.files_changed[:12]:
             lines.append(f"    {f}")
         lines.append("")
+    if result.concerns:
+        lines.append("  IT IS NOT SURE ABOUT THIS. Read the diff before you merge:")
+        for c in result.concerns:
+            lines.append(f"    {c[:66]}")
+        lines.append("")
     if result.summary:
         lines.append("  what it says:")
         for l in result.summary.splitlines()[-8:]:
@@ -334,7 +370,7 @@ def report(result: ShiftResult) -> str:
         for l in refused[:5]:
             lines.append(f"    {l[:68]}")
         lines.append("")
-    if result.outcome == "fixed":
+    if result.outcome in ("fixed", "fixed_with_concerns"):
         lines.append(f"  Review it:  git diff main..{result.branch}")
     lines.append("")
     return "\n".join(lines)

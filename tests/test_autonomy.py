@@ -190,3 +190,63 @@ def test_scout_finds_nothing_in_a_clean_repo(tmp_path):
 def test_morning_report_reads_cleanly_with_no_work():
     out = morning_report(WatchLog())
     assert "Nothing needed doing" in out
+
+
+# ---- a green test is not proof of correctness -------------------------
+
+
+def test_hedging_is_detected_and_surfaced():
+    """The real case this came from: the agent deleted the ellipsis to satisfy a
+    length assertion, and said so. Green tests, wrong change."""
+    from journeyman.autonomy.shift import find_concerns
+
+    summary = ("DONE: changed it to return s[:limit]. But this creates a mismatch "
+               "with the docstring. However it is the minimal change.")
+    found = find_concerns(summary)
+    assert found, "an agent admitting doubt must be flagged"
+    assert any("mismatch" in c.lower() for c in found)
+
+
+def test_a_confident_summary_is_not_flagged():
+    from journeyman.autonomy.shift import find_concerns
+
+    assert not find_concerns(
+        "DONE: Fixed both bugs by correcting the percentage calculation."
+    )
+
+
+def test_concerned_fixes_are_reported_differently():
+    from journeyman.autonomy.shift import ShiftResult, report
+    from journeyman.autonomy.scout import Task
+
+    t = Task(kind="failing_test", title="t", detail="", where="x.py", priority=100)
+    r = ShiftResult(task=t, outcome="fixed_with_concerns", green=True,
+                    concerns=["But this creates a mismatch with the docstring."],
+                    branch="journeyman/x", files_changed=["x.py"])
+    out = report(r)
+    assert "FIXED, BUT READ THIS" in out
+    assert "IT IS NOT SURE ABOUT THIS" in out
+    assert "mismatch" in out
+
+
+def test_watch_does_not_attempt_the_same_task_twice(tmp_path, monkeypatch):
+    """Each shift branches from HEAD, so a fix in shift 1 is absent in shift 2.
+    Without de-duplication the watch hands you five branches for one bug."""
+    import journeyman.autonomy.watch as W
+    from journeyman.autonomy.scout import Task
+    from journeyman.autonomy.shift import ShiftResult
+
+    task = Task(kind="failing_test", title="same bug every time",
+                detail="", where="tests/test_x.py", priority=100)
+    monkeypatch.setattr(W, "survey", lambda repo: [task])
+    seen = []
+
+    def fake_work(repo, task=None, budget=None, **kw):
+        seen.append(task)
+        return ShiftResult(task=task, outcome="stuck", summary="no change")
+
+    monkeypatch.setattr(W, "work_one", fake_work)
+    log = W.stand_watch(tmp_path, max_shifts=5, interval_s=0, stop_after_barren=99)
+
+    assert len(seen) == 1, f"attempted the same task {len(seen)} times"
+    assert "worked every item" in log.stopped_because

@@ -21,6 +21,11 @@ from .scout import describe, survey
 from .shift import ShiftResult, report, work_one
 
 
+def _signature(task) -> str:
+    """Identifies a task across shifts, so the watch does not redo it."""
+    return f"{task.kind}:{task.where}:{task.title[:60]}"
+
+
 @dataclass
 class WatchLog:
     started: float = field(default_factory=time.time)
@@ -29,7 +34,11 @@ class WatchLog:
 
     @property
     def fixed(self) -> int:
-        return sum(1 for s in self.shifts if s.outcome == "fixed")
+        return sum(1 for s in self.shifts if s.outcome in ("fixed", "fixed_with_concerns"))
+
+    @property
+    def needs_a_look(self) -> list:
+        return [s for s in self.shifts if s.concerns]
 
     def to_dict(self) -> dict:
         return {
@@ -60,6 +69,11 @@ def stand_watch(
     barren = 0
     deadline = time.time() + max_hours * 3600
 
+    # Each shift branches fresh from the current HEAD, so a fix made in shift 1
+    # is not present when shift 2 surveys. Without this, the watch attempts the
+    # same failing test all night and hands you five branches for one bug.
+    attempted: set[str] = set()
+
     while True:
         if len(log.shifts) >= max_shifts:
             log.stopped_because = f"reached the limit of {max_shifts} shifts"
@@ -68,17 +82,22 @@ def stand_watch(
             log.stopped_because = f"reached the time limit of {max_hours}h"
             break
 
-        queue = survey(repo)
+        queue = [t for t in survey(repo) if _signature(t) not in attempted]
         if not queue:
-            log.stopped_because = "nothing left to do"
+            log.stopped_because = (
+                "nothing left to do" if not attempted
+                else f"worked every item in the queue ({len(attempted)} attempted)"
+            )
             break
 
-        result = work_one(repo, task=queue[0], budget=Budget())
+        task = queue[0]
+        attempted.add(_signature(task))
+        result = work_one(repo, task=task, budget=Budget())
         log.shifts.append(result)
         if on_shift:
             on_shift(result)
 
-        if result.outcome == "fixed":
+        if result.outcome in ("fixed", "fixed_with_concerns"):
             barren = 0
         else:
             barren += 1
@@ -104,18 +123,25 @@ def morning_report(log: WatchLog) -> str:
     if not log.shifts:
         lines += ["  Nothing needed doing.", ""]
     for s in log.shifts:
-        mark = {"fixed": "[fixed]  ", "stuck": "[stuck]  ", "refused": "[refused]",
+        mark = {"fixed": "[fixed]  ", "fixed_with_concerns": "[CHECK]  ",
+                "stuck": "[stuck]  ", "refused": "[refused]",
                 "error": "[error]  ", "no_work": "[none]   "}[s.outcome]
         title = s.task.title[:52] if s.task else "-"
         lines.append(f"  {mark} {title}")
         if s.branch:
             lines.append(f"            {s.branch}")
+        if s.concerns:
+            lines.append(f"            unsure: {s.concerns[0][:52]}")
         if s.outcome == "stuck" and s.summary:
             lines.append(f"            {s.summary.splitlines()[-1][:58]}")
         lines.append("")
     if log.stopped_because:
         lines += [f"  Stopped: {log.stopped_because}", ""]
-    branches = [s.branch for s in log.shifts if s.outcome == "fixed"]
+    if log.needs_a_look:
+        lines += [f"  {len(log.needs_a_look)} change(s) the agent was unsure about. "
+                  "Read those diffs first.", ""]
+    branches = [s.branch for s in log.shifts
+                if s.outcome in ("fixed", "fixed_with_concerns")]
     if branches:
         lines += ["  Review:", ""]
         lines += [f"    git diff main..{b}" for b in branches]
