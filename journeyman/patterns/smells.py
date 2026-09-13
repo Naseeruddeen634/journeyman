@@ -138,7 +138,15 @@ def check_unvalidated_parsing(path: Path, text: str, tree: ast.AST, rel: str) ->
         if _call_name(node) not in ("json.loads", "loads"):
             continue
         src = ast.get_source_segment(text, node) or ""
-        if not re.search(r"(response|completion|message|content|output|result|text|reply)",
+        # Reading a config or data file off disk is not parsing model output.
+        # An earlier version matched the bare word "text", which is a substring
+        # of read_text, so every json.loads(path.read_text()) in the codebase
+        # was reported as an unvalidated model response.
+        if re.search(r"(read_text|read_bytes|open\(|Path\(|\.json|_file|file_?path|"
+                     r"CONFIG|config_|from_file)", src):
+            continue
+        if not re.search(r"(response|completion|choices|message\.content|\.content|"
+                         r"output_text|model_output|llm_|generated|reply|answer)",
                          src, re.I):
             continue
         out.append(Finding(
@@ -159,6 +167,8 @@ def check_prompt_injection_surface(path: Path, text: str, tree: ast.AST, rel: st
     """AIE004. User text interpolated into a prompt with no boundary."""
     out = []
     for i, line in enumerate(text.splitlines(), 1):
+        if line.lstrip().startswith("#"):
+            continue      # a comment describing the pattern is not the pattern
         if not re.search(r"(prompt|system|instruction|template)", line, re.I):
             continue
         if not re.search(r'f["\']|\.format\(|%\s*\(|\+\s*\w+', line):
@@ -463,6 +473,30 @@ FILE_CHECKS = [
 ]
 
 
+def string_line_ranges(tree: ast.AST) -> set[int]:
+    """Every line that sits inside a string literal or a docstring.
+
+    A checker that reads code line by line will happily flag the example of the
+    bad pattern written inside a test fixture, or the pattern written inside
+    this file's own documentation. Neither is executed, so neither is a finding.
+    Left unfixed, a repo's own tests become its worst offenders and people
+    switch the tool off.
+    """
+    lines: set[int] = set()
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Constant) and isinstance(node.value, str)):
+            continue
+        end = getattr(node, "end_lineno", node.lineno) or node.lineno
+        # Only literals that span lines: a triple-quoted block, or adjacent
+        # string literals which the parser joins into one node. A single-line
+        # string is ordinary code, and an earlier version that skipped those
+        # lines silently stopped flagging `prompt = f"Answer: {user_query}"`,
+        # which is the single most important thing this file looks for.
+        if end > node.lineno:
+            lines.update(range(node.lineno, end + 1))
+    return lines
+
+
 def _call_name(node: ast.Call) -> str:
     parts = []
     cur = node.func
@@ -474,10 +508,17 @@ def _call_name(node: ast.Call) -> str:
     return ".".join(reversed(parts))
 
 
-def review(repo: str | Path) -> list[Finding]:
-    """Review a repository the way an AI engineer would, worst first."""
+def review(repo: str | Path, on_check_error=None) -> list[Finding]:
+    """Review a repository the way an AI engineer would, worst first.
+
+    ``on_check_error`` is called with (check_name, path, exception) when a check
+    raises. A broken check must not take the whole review down, but swallowing
+    it silently means a check can rot for months while the report quietly gets
+    shorter. AIE006 flagged this function for exactly that, and it was right.
+    """
     repo = Path(repo).resolve()
     findings: list[Finding] = []
+    errors: list[tuple[str, str, str]] = []
 
     for path in _files(repo):
         try:
@@ -491,13 +532,33 @@ def review(repo: str | Path) -> list[Finding]:
         except SyntaxError:
             continue
         rel = str(path.relative_to(repo))
+        in_strings = string_line_ranges(tree)
         for check in FILE_CHECKS:
             try:
-                findings.extend(check(path, text, tree, rel))
-            except Exception:
-                continue   # a broken check must never take the review down
+                for f in check(path, text, tree, rel):
+                    line = f.where.rsplit(":", 1)[-1]
+                    if line.isdigit() and int(line) in in_strings:
+                        continue   # it is an example, not executed code
+                    findings.append(f)
+            except Exception as exc:
+                errors.append((check.__name__, rel, f"{type(exc).__name__}: {exc}"))
+                if on_check_error is not None:
+                    on_check_error(check.__name__, rel, exc)
 
     findings.extend(check_prompt_without_eval(repo))
+
+    if errors and on_check_error is None:
+        # Nobody asked to be told, so make it visible in the report itself
+        # rather than losing it.
+        for name, where, msg in errors[:3]:
+            findings.append(Finding(
+                code="AIE000",
+                title=f"the check {name} raised and was skipped",
+                why=("This check did not run on at least one file, so the report is "
+                     "incomplete and nothing else would have told you."),
+                fix=f"Fix the checker. It failed on {where} with {msg}",
+                where=where, severity=30,
+            ))
     return sorted(findings, key=lambda f: -f.severity)
 
 

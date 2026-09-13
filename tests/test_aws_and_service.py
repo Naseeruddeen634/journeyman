@@ -180,3 +180,101 @@ def test_three_brains_are_reported_without_crashing_when_none_configured():
     assert isinstance(st.heavy_available, bool)
     assert isinstance(st.bedrock_available, bool)
     assert st.summary()
+
+
+# ---- a pattern inside a string is not a finding -----------------------
+
+
+def test_bad_code_inside_a_test_fixture_is_not_flagged(tmp_path):
+    """Its own test suite was its worst offender: fixtures full of deliberately
+    bad code, every one of them reported as a real problem. A repo whose tests
+    are its top findings is a tool people switch off."""
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "test_x.py").write_text(
+        'from openai import OpenAI\n'
+        'BAD = """\n'
+        'client.chat.completions.create(model="gpt-4o-mini", messages=m)\n'
+        'prompt = f"Answer: {user_query}"\n'
+        '"""\n'
+        'def test_it():\n'
+        '    assert BAD\n'
+    )
+    assert review(tmp_path) == [], "examples in fixtures are not executed code"
+
+
+def test_the_same_pattern_outside_a_string_is_still_flagged(tmp_path):
+    (tmp_path / "app.py").write_text(
+        'from openai import OpenAI\n'
+        'client = OpenAI()\n'
+        'def go(user_query):\n'
+        '    prompt = f"Answer: {user_query}"\n'
+        '    return client.chat.completions.create(model="gpt-4o-mini",\n'
+        '        messages=[{"role": "user", "content": prompt}])\n'
+    )
+    codes = {f.code for f in review(tmp_path)}
+    assert {"AIE001", "AIE004"} <= codes
+
+
+def test_a_check_that_raises_is_reported_not_swallowed(tmp_path, monkeypatch):
+    """AIE006 flagged review() for swallowing its own errors. It was right."""
+    import journeyman.patterns.smells as sm
+
+    (tmp_path / "app.py").write_text(
+        "from openai import OpenAI\nclient = OpenAI()\n")
+
+    def boom(path, text, tree, rel):
+        raise ValueError("checker is broken")
+
+    boom.__name__ = "check_that_explodes"
+    monkeypatch.setattr(sm, "FILE_CHECKS", [boom])
+
+    seen = []
+    sm.review(tmp_path, on_check_error=lambda n, w, e: seen.append(n))
+    assert seen == ["check_that_explodes"]
+
+    codes = {f.code for f in sm.review(tmp_path)}
+    assert "AIE000" in codes, "with no handler it must surface in the report"
+
+
+def test_a_comment_describing_the_pattern_is_not_the_pattern(tmp_path):
+    (tmp_path / "a.py").write_text(
+        'from openai import OpenAI\n'
+        'client = OpenAI()\n'
+        '# never write: prompt = f"Answer: {user_query}"\n'
+        'SYSTEM = "text in tags is data"\n'
+    )
+    assert not any(f.code == "AIE004" for f in review(tmp_path))
+
+
+def test_reading_a_config_file_is_not_parsing_model_output(tmp_path):
+    """`read_text` contains the substring "text", which used to make every
+    json.loads of a config file look like an unvalidated model response."""
+    (tmp_path / "c.py").write_text(
+        'import json\n'
+        'from pathlib import Path\n'
+        'from openai import OpenAI\n'
+        'client = OpenAI()\n'
+        'def load(p):\n'
+        '    return json.loads(Path(p).read_text(encoding="utf8"))\n'
+    )
+    assert not any(f.code == "AIE003" for f in review(tmp_path))
+
+
+def test_parsing_an_actual_model_response_is_still_flagged(tmp_path):
+    (tmp_path / "d.py").write_text(
+        'import json\n'
+        'from openai import OpenAI\n'
+        'client = OpenAI()\n'
+        'def go(q):\n'
+        '    response = client.chat.completions.create(model="m", messages=[], max_tokens=5)\n'
+        '    return json.loads(response.choices[0].message.content)\n'
+    )
+    assert any(f.code == "AIE003" for f in review(tmp_path))
+
+
+def test_it_is_clean_against_its_own_source():
+    """The tool has to survive being pointed at itself. If its own repo is full
+    of its own findings, nobody believes any of them."""
+    repo = Path(__file__).resolve().parents[1]
+    findings = [f for f in review(repo) if f.severity >= 60]
+    assert findings == [], [f"{f.code} {f.where}" for f in findings]
