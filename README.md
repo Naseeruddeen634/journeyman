@@ -139,13 +139,81 @@ intake -> architect -> recall -> harness -> prove
 Both edge conditions read a value computed in Python, not text a model wrote.
 
 
+
+## It knows what AI engineering breaks
+
+A linter finds unused imports. It does not know that a prompt with no eval is a
+liability, that a hardcoded model id is a deprecation with a delay fuse, or that
+`json.loads(response.content)` is going to page someone.
+
+`journeyman review` is that knowledge, as nine static checks. Each one is
+something a person who has shipped LLM features would stop at in a pull request,
+with the reason they would give and the fix they would suggest.
+
+| | |
+|---|---|
+| **AIE001** | a model id hardcoded mid-function instead of read from config |
+| **AIE002** | no `max_tokens`: unbounded cost, unbounded p99 |
+| **AIE003** | model output parsed with `json.loads` and no schema |
+| **AIE004** | user text interpolated straight into a prompt |
+| **AIE005** | an LLM call with no timeout or retry anywhere in the file |
+| **AIE006** | an exception swallowed in an LLM path, so quality drops silently |
+| **AIE007** | a test that calls a live model with no temperature or seed |
+| **AIE008** | a prompt with no eval. Nothing measures it, so nothing can go red |
+| **AIE009** | model calls inside a loop with no usage accounting |
+
+```
+  [85] AIE008  prompts/triage_prompt.txt is a prompt with no eval
+        Nothing measures this prompt, so nobody can tell whether the next
+        edit helps or hurts. Changes get made on feel and regressions ship
+        silently, because there is no signal to go red.
+
+        Fix: Build a small eval set for it, hold half of it back, and
+        record the score before you touch it. Twenty cases beats zero by
+        more than a hundred beats twenty.
+```
+
+Findings go into the work queue, so a shift can fix them while you are away.
+
+**The load-bearing property is silence.** False positives are what kill a
+linter, so every check only fires inside files that are doing LLM work, and
+`test_review_is_quiet_on_code_that_does_it_properly` asserts that a
+well-written module produces **zero** findings.
+
+## What running it taught me
+
+Three bugs that reading the code would not have found.
+
+**The gate was wrong.** It demanded a green suite. Real repositories arrive red:
+a test needs a credential, an integration suite is skipped, someone left a known
+failure. Every honest piece of work came back `STUCK`. It now records which tests
+are red *before* the agent starts and gates on new ones. Broke nothing is the
+bar. Perfection is not.
+
+**Two checks silently missed the thing they existed to find.** AIE001 skipped the
+kwarg `model="gpt-4o-mini"` it was hunting, because its "this is configured
+properly" exemption matched `model=` anywhere on the line. AIE004 missed
+`{ticket_text}` because `\b` does not split on an underscore. Both were passing
+their own tests and finding nothing.
+
+**The agent claimed a change it did not make.** It reported *"1. Added
+delimiters. 2. Updated the system prompt to separate instructions from data."*
+The diff moved one line and never touched a system prompt. Re-running the test
+suite cannot catch that, because the claim is about the change rather than the
+outcome. `claims_vs_diff` now compares what it said against what actually moved,
+and the report says **READ THE DIFF BEFORE YOU MERGE**.
+
+That last one is the argument for the whole design. An agent will tell you it did
+something. The only defence is checking.
+
 ## It works when you are not there
 
 Everything above is Journeyman doing a job you asked for. This part is it
 working the queue on its own.
 
 ```bash
-journeyman scout                 # what is worth doing in this repo right now
+journeyman review                # what an AI engineer would flag here
+journeyman scout                 # everything worth doing, ranked
 journeyman shift                 # take the top item, work it, report
 journeyman watch --max-shifts 6  # keep going until the queue is empty
 ```
