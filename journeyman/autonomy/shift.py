@@ -61,6 +61,45 @@ DOUBT = (
 )
 
 
+def claims_vs_diff(summary: str, diff: str) -> list[str]:
+    """Check what it said it did against what it actually did.
+
+    Observed in a real shift: the agent reported "1. Added delimiters around
+    the input. 2. Updated the system prompt to separate instructions from
+    data." The diff changed one line and never touched a system prompt.
+
+    Testing that the suite still passes does not catch this, because the claim
+    is about the change, not about the outcome. So compare the enumerated
+    claims against the size of the diff, and compare any file the summary names
+    against the files that actually moved.
+    """
+    notes: list[str] = []
+    if not summary:
+        return notes
+
+    added = [l for l in diff.splitlines() if l.startswith("+") and not l.startswith("+++")]
+    removed = [l for l in diff.splitlines() if l.startswith("-") and not l.startswith("---")]
+    touched = max(len(added), len(removed))
+
+    claims = re.findall(r"^\s*(?:\d+[.)]|[-*])\s+(\S.{10,})$", summary, re.M)
+    if len(claims) >= 2 and touched <= 1:
+        notes.append(
+            f"It lists {len(claims)} changes but the diff moves {touched} line(s). "
+            "Check whether everything it claims is actually there."
+        )
+
+    named = set(re.findall(r"[\w/]+\.(?:py|txt|md|json|ya?ml)", summary))
+    changed_in_diff = set(re.findall(r"^\+\+\+ b/(\S+)", diff, re.M))
+    if changed_in_diff:
+        missing = {f for f in named if not any(f in c for c in changed_in_diff)}
+        if missing:
+            notes.append(
+                "It mentions " + ", ".join(sorted(missing)[:3])
+                + " but the diff does not touch that file."
+            )
+    return notes
+
+
 def find_concerns(summary: str) -> list[str]:
     """Sentences where the agent hedged about its own change."""
     out = []
@@ -87,8 +126,12 @@ class ShiftResult:
     diff: str = ""
     commit: str = ""
     summary: str = ""
-    outcome: str = "no_work"     # fixed | fixed_with_concerns | stuck | refused | no_work | error
+    outcome: str = "no_work"     # fixed | fixed_with_concerns | stuck | regressed | refused | no_work | error
     concerns: list[str] = field(default_factory=list)
+    failures_before: list[str] = field(default_factory=list)
+    failures_after: list[str] = field(default_factory=list)
+    new_failures: list[str] = field(default_factory=list)
+    fixed_failures: list[str] = field(default_factory=list)
     brain: str = ""
     log: list[str] = field(default_factory=list)
     budget: dict = field(default_factory=dict)
@@ -103,9 +146,36 @@ class ShiftResult:
             "branch": self.branch, "outcome": self.outcome, "green": self.green,
             "files_changed": self.files_changed, "commit": self.commit,
             "summary": self.summary, "brain": self.brain, "concerns": self.concerns,
+            "failures_before": self.failures_before, "failures_after": self.failures_after,
+            "new_failures": self.new_failures, "fixed_failures": self.fixed_failures,
             "minutes": self.minutes, "budget": self.budget,
             "diff": self.diff[:8000], "log": self.log[-80:],
         }
+
+
+FAIL_LINE = re.compile(r"^(?:FAILED|ERROR)\s+(\S+)", re.M)
+
+
+def failing_set(repo: Path) -> tuple[set[str], str]:
+    """Which tests are red right now, as a set of node ids.
+
+    The gate cannot be "the suite is green". Plenty of real repositories are
+    not green when you arrive: a test needs a credential, an integration suite
+    is skipped in CI, someone left a known failure. Demanding perfection means
+    every honest piece of work gets reported as STUCK.
+
+    What matters is whether the agent broke anything that was working.
+    """
+    from .scout import _interpreter
+
+    try:
+        r = subprocess.run(
+            [_interpreter(repo), "-m", "pytest", "-q", "--no-header", "--tb=no"],
+            cwd=repo, capture_output=True, text=True, timeout=300)
+    except (subprocess.TimeoutExpired, OSError) as exc:
+        return set(), f"could not run the suite: {exc}"
+    out = r.stdout + r.stderr
+    return set(FAIL_LINE.findall(out)), out[-2500:]
 
 
 def _tools_for(sandbox: Sandbox, result: ShiftResult):
@@ -248,6 +318,12 @@ def work_one(repo: str | Path, task: Task | None = None, budget: Budget | None =
         result.finished = time.time()
         return result
 
+    # Baseline before the agent touches anything, inside the sandbox so it is
+    # the same tree the agent will work in.
+    before, before_out = failing_set(sandbox.root)
+    result.failures_before = sorted(before)
+    result.tests_before = before_out
+
     brief = (
         f"TASK ({task.kind}, priority {task.priority})\n"
         f"{task.title}\n\n"
@@ -275,34 +351,39 @@ def work_one(repo: str | Path, task: Task | None = None, budget: Budget | None =
         result.summary = f"{type(exc).__name__}: {exc}"
 
     # ---- verify for ourselves. The agent's own claim is not evidence. ----
-    from .scout import _interpreter
-
-    try:
-        verify = subprocess.run(
-            [_interpreter(sandbox.root), "-m", "pytest", "-q", "--no-header", "--tb=line"],
-            cwd=sandbox.root, capture_output=True, text=True, timeout=300)
-        result.tests_after = (verify.stdout + verify.stderr)[-2500:]
-        result.green = verify.returncode == 0
-    except (subprocess.TimeoutExpired, OSError) as exc:
-        result.tests_after = f"verification run failed: {exc}"
-        result.green = False
+    after, after_out = failing_set(sandbox.root)
+    result.failures_after = sorted(after)
+    result.tests_after = after_out
+    result.new_failures = sorted(after - before)
+    result.fixed_failures = sorted(before - after)
+    result.green = not after
 
     result.files_changed = sandbox.changed_files()
     result.diff = sandbox.run("git diff").stdout if result.files_changed else ""
     result.log = sandbox.log
     result.budget = budget.to_dict()
 
-    result.concerns = find_concerns(result.summary)
+    result.concerns = find_concerns(result.summary) + claims_vs_diff(
+        result.summary, result.diff
+    )
 
     if result.outcome not in ("refused", "error"):
-        if result.green and result.files_changed:
-            # Green is necessary, not sufficient. If it hedged, say so loudly.
-            result.outcome = "fixed_with_concerns" if result.concerns else "fixed"
+        if result.new_failures:
+            # Broke something that was working. Nothing else matters.
+            result.outcome = "regressed"
+            result.summary = (
+                f"Broke {len(result.new_failures)} test(s) that were passing: "
+                + ", ".join(result.new_failures[:3]) + ". Not committed."
+            )
         elif not result.files_changed:
             result.outcome = "stuck"
             result.summary = result.summary or "Made no changes."
-        else:
+        elif task.kind == "failing_test" and not result.fixed_failures:
+            # It was sent to fix a red test and the test is still red.
             result.outcome = "stuck"
+        else:
+            # Changed something, broke nothing. If it hedged, say so loudly.
+            result.outcome = "fixed_with_concerns" if result.concerns else "fixed"
 
     # commit only what survived verification
     if result.outcome in ("fixed", "fixed_with_concerns"):
@@ -326,8 +407,9 @@ def work_one(repo: str | Path, task: Task | None = None, budget: Budget | None =
 def report(result: ShiftResult) -> str:
     """What you read in the morning."""
     icon = {"fixed": "FIXED", "fixed_with_concerns": "FIXED, BUT READ THIS",
-            "stuck": "STUCK", "refused": "REFUSED",
-            "no_work": "NOTHING TO DO", "error": "ERROR"}[result.outcome]
+            "regressed": "BROKE SOMETHING, NOT COMMITTED", "stuck": "STUCK",
+            "refused": "REFUSED", "no_work": "NOTHING TO DO",
+            "error": "ERROR"}[result.outcome]
     lines = ["", "=" * 72]
     if result.task:
         lines.append(f"  {icon}   {result.task.title[:58]}")
@@ -342,7 +424,15 @@ def report(result: ShiftResult) -> str:
         lines.append(f"  branch    {result.branch}")
     if result.commit:
         lines.append(f"  commit    {result.commit}")
-    lines.append(f"  tests     {'green' if result.green else 'still failing'}")
+    if result.failures_before or result.failures_after:
+        lines.append(f"  tests     {len(result.failures_before)} red before, "
+                     f"{len(result.failures_after)} red after")
+        if result.fixed_failures:
+            lines.append(f"            fixed:  {', '.join(result.fixed_failures[:3])}")
+        if result.new_failures:
+            lines.append(f"            BROKE:  {', '.join(result.new_failures[:3])}")
+    else:
+        lines.append("  tests     green before and after")
     lines.append(f"  took      {result.minutes} min")
     if result.budget:
         b = result.budget
@@ -355,7 +445,7 @@ def report(result: ShiftResult) -> str:
             lines.append(f"    {f}")
         lines.append("")
     if result.concerns:
-        lines.append("  IT IS NOT SURE ABOUT THIS. Read the diff before you merge:")
+        lines.append("  READ THE DIFF BEFORE YOU MERGE:")
         for c in result.concerns:
             lines.append(f"    {c[:66]}")
         lines.append("")

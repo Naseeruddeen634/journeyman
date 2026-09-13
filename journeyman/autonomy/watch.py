@@ -124,8 +124,9 @@ def morning_report(log: WatchLog) -> str:
         lines += ["  Nothing needed doing.", ""]
     for s in log.shifts:
         mark = {"fixed": "[fixed]  ", "fixed_with_concerns": "[CHECK]  ",
-                "stuck": "[stuck]  ", "refused": "[refused]",
-                "error": "[error]  ", "no_work": "[none]   "}[s.outcome]
+                "regressed": "[BROKE]  ", "stuck": "[stuck]  ",
+                "refused": "[refused]", "error": "[error]  ",
+                "no_work": "[none]   "}[s.outcome]
         title = s.task.title[:52] if s.task else "-"
         lines.append(f"  {mark} {title}")
         if s.branch:

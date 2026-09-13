@@ -83,6 +83,31 @@ def _scout(args) -> int:
     return 0
 
 
+def _review(args) -> int:
+    """Review this repo the way an AI engineer would."""
+    from .patterns.smells import review, summarise
+
+    findings = review(args.repo)
+    print(f"\n  {summarise(findings)}\n")
+    if not findings:
+        print("  Nothing to flag.\n")
+        return 0
+    for f in findings[: args.limit]:
+        print(f"  [{f.severity:>2}] {f.code}  {f.title}")
+        print(f"        {f.where}")
+        if args.verbose:
+            import textwrap
+            for line in textwrap.wrap(f.why, 66):
+                print(f"        {line}")
+            print()
+            for line in textwrap.wrap("Fix: " + f.fix, 66):
+                print(f"        {line}")
+        print()
+    if not args.verbose:
+        print("  Run with --verbose for the reasoning and the fix.\n")
+    return 1 if any(f.severity >= 80 for f in findings) else 0
+
+
 def _shift(args) -> int:
     """One unattended shift: take the top task, work it, report."""
     from .autonomy.guardrails import Budget
@@ -183,6 +208,12 @@ def main(argv: list[str] | None = None) -> int:
     sc.add_argument("--repo", default=".")
     sc.add_argument("--limit", type=int, default=12)
     sc.set_defaults(func=_scout)
+
+    rv = sub.add_parser("review", help="AI engineering review of this repo")
+    rv.add_argument("--repo", default=".")
+    rv.add_argument("--limit", type=int, default=20)
+    rv.add_argument("-v", "--verbose", action="store_true")
+    rv.set_defaults(func=_review)
 
     sh = sub.add_parser("shift", help="work one task unattended and report")
     sh.add_argument("--repo", default=".")

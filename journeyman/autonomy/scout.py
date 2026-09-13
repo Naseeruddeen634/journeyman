@@ -177,6 +177,31 @@ def untested_functions(repo: Path, limit: int = 25) -> list[Task]:
     return tasks
 
 
+def ai_engineering_review(repo: Path, limit: int = 15) -> list[Task]:
+    """Findings a senior AI engineer would raise in review.
+
+    This is what separates the queue from a generic linter's. A hardcoded model
+    id, a prompt with no eval, user text interpolated into a system prompt: none
+    of those are syntax errors, all of them are the thing that pages someone.
+    """
+    from ..patterns.smells import review
+
+    tasks = []
+    for f in review(repo)[:limit]:
+        tasks.append(Task(
+            kind="ai_review",
+            title=f"{f.code}: {f.title}",
+            detail=f"{f.why}\n\nWhat to do: {f.fix}",
+            where=f.where,
+            # slot below failing tests, above TODOs: these are real problems,
+            # but a red test is a problem you already know about
+            priority=min(95, 45 + f.severity // 2),
+            evidence=f.evidence,
+            meta={"code": f.code, "severity": f.severity},
+        ))
+    return tasks
+
+
 def backlog(repo: Path) -> list[Task]:
     """Anything you left in BACKLOG.md. Unchecked boxes are the queue."""
     f = repo / "BACKLOG.md"
@@ -199,6 +224,7 @@ def survey(repo: str | Path) -> list[Task]:
     repo = Path(repo).resolve()
     tasks: list[Task] = []
     tasks += failing_tests(repo)
+    tasks += ai_engineering_review(repo)
     tasks += backlog(repo)
     tasks += todos(repo)
     tasks += untested_functions(repo)
