@@ -1,0 +1,1922 @@
+[
+  {
+    "id": "doc-0000",
+    "document": "REMlTTANCE\nSupplier: Blue Harbour Logistics\nAccount no. 447166902860092\nDate: 22.08.2025\nRef: PO-84917\n\n  11 x Signage, 3 panels                USD 388.12\n  6 x A4 paper, 5 reams                USD 228.65\n\nTotal payable ..... $3,664.44\n",
+    "truth": {
+      "vendor": "Blue Harbour Logistics",
+      "date": "2025-08-22",
+      "total": 3664.44,
+      "currency": "USD",
+      "po_number": "PO-84917"
+    },
+    "meta": {
+      "template": 6,
+      "date_style": 5,
+      "amount_style": 0
+    }
+  },
+  {
+    "id": "doc-0001",
+    "document": "TechParts GmbH\nCork\n\nInvoice date : September 12, 1998\nPayment due  : October 12, 1998\nOrder ref    : PO-44255\n\n  9 x Catering, 12 covers              EUR 538.06\n  10 x Safety gloves (box of 50)        EUR 179.10\n  1 x Pallet delivery surcharge        EUR 511.50\n\nSubtotal     : 7.316,34 EUR\nVAT @ 23%    : 1.682,77 EUR\nTotal        : 8.999,11 EUR\n",
+    "truth": {
+      "vendor": "TechParts GmbH",
+      "date": "1998-09-12",
+      "total": 8999.11,
+      "currency": "EUR",
+      "po_number": "PO-44255"
+    },
+    "meta": {
+      "template": 4,
+      "date_style": 3,
+      "amount_style": 3
+    }
+  },
+  {
+    "id": "doc-0002",
+    "document": "*** REMITTANCE ADVICE ***\nSupplier ..... Meridian Office Services\nOur ref ...... PO-73562\nDate issued .. 4 Sep 2024\n\n  2 x Signage, 3 panels                USD 56.48\n  7 x A4 paper, 5 reams                USD 98.43\n  1 x Signage, 3 panels                USD 380.01\n  5 x Replacement filter unit          USD 493.57\n\nBalance to pay:  1.081,80 USD\nPlease quote the reference above when paying.\n",
+    "truth": {
+      "vendor": "Meridian Office Services",
+      "date": "2024-09-04",
+      "total": 1081.8,
+      "currency": "USD",
+      "po_number": "PO-73562"
+    },
+    "meta": {
+      "template": 2,
+      "date_style": 2,
+      "amount_style": 3
+    }
+  },
+  {
+    "id": "doc-0003",
+    "document": "Riverside Print Co\nLimerick | VAT IE3003227\n\nAmount payable 1,573.54 USD\nRef PO-93350   Dated 2019-09-12\n\nItems:\n  11 x Cable ties 200mm                 USD 629.82\n  5 x Replacement filter unit          USD 746.33\n  3 x Site survey, half day            USD 189.86\n",
+    "truth": {
+      "vendor": "Riverside Print Co",
+      "date": "2019-09-12",
+      "total": 1573.54,
+      "currency": "USD",
+      "po_number": "PO-93350"
+    },
+    "meta": {
+      "template": 1,
+      "date_style": 0,
+      "amount_style": 2
+    }
+  },
+  {
+    "id": "doc-0004",
+    "document": "INVOICE\n\nFrom: Meridian Office Services\n89 Bridge Street\nLimerick\n\nInvoice date: 18 Feb 2023\nPO Number: PO-82686\n\n  8 x Signage, 3 panels                USD 712.19\n\nTOTAL DUE: $6,993.03\n",
+    "truth": {
+      "vendor": "Meridian Office Services",
+      "date": "2023-02-18",
+      "total": 6993.03,
+      "currency": "USD",
+      "po_number": "PO-82686"
+    },
+    "meta": {
+      "template": 0,
+      "date_style": 2,
+      "amount_style": 0
+    }
+  },
+  {
+    "id": "doc-0005",
+    "document": "PURCHASE ORDER CONFIRMATION\n============================\nVENDOR      : Clearwater Sanitation\nPO REF      : PO-18863\nDATE        : 15-Dec-25\nLOCATION    : Belfast\n----------------------------\n  6 x Toner cartridge HP-26X           EUR 276.34\n  9 x Toner cartridge HP-26X           EUR 57.48\n  10 x Safety gloves (box of 50)        EUR 712.50\n  6 x Signage, 3 panels                EUR 480.20\n----------------------------\nGRAND TOTAL : EUR 3,426.67\n",
+    "truth": {
+      "vendor": "Clearwater Sanitation",
+      "date": "2025-12-15",
+      "total": 3426.67,
+      "currency": "EUR",
+      "po_number": "PO-18863"
+    },
+    "meta": {
+      "template": 7,
+      "date_style": 4,
+      "amount_style": 1
+    }
+  },
+  {
+    "id": "doc-0006",
+    "document": "Aoife Byrne Catering\nUnit 4, 11 Quay Street\nLimerick\nIreland\n\nDear Customer,\n\nPlease find enclosed our invoice dated 1998-05-14 under purchase order PO-12990.\n\n  2 x Safety gloves (box of 50)        EUR 633.68\n  1 x Site survey, half day            EUR 721.48\n  2 x Safety gloves (box of 50)        EUR 374.14\n  3 x Safety gloves (box of 50)        EUR 623.73\n\nThe amount of 6,435.94 EUR is due within 30 days of the date above.\n\nRegards,\nAccounts Receivable\n",
+    "truth": {
+      "vendor": "Aoife Byrne Catering",
+      "date": "1998-05-14",
+      "total": 6435.94,
+      "currency": "EUR",
+      "po_number": "PO-12990"
+    },
+    "meta": {
+      "template": 3,
+      "date_style": 0,
+      "amount_style": 2
+    }
+  },
+  {
+    "id": "doc-0007",
+    "document": "REMlTTANCE\nSupplier: Clearwater Sanitation\nAccount no. 447199906060092\nDate: 23/07/2024\nRef: PO-51549\n\n  7 x Replacement filter unit          USD 84.02\n  9 x Site survey, half day            USD 511.90\n\nTotal payable ..... 869,61 USD\n",
+    "truth": {
+      "vendor": "Clearwater Sanitation",
+      "date": "2024-07-23",
+      "total": 869.61,
+      "currency": "USD",
+      "po_number": "PO-51549"
+    },
+    "meta": {
+      "template": 6,
+      "date_style": 1,
+      "amount_style": 3
+    }
+  },
+  {
+    "id": "doc-0008",
+    "document": "O'Sullivan Hardware\nUnit 4, 34 Abbey Street\nLimerick\nIreland\n\nDear Customer,\n\nPlease find enclosed our invoice dated 2019-03-27 under purchase order PO-56558.\n\n  9 x Replacement filter unit          EUR 318.57\n  4 x Cable ties 200mm                 EUR 431.69\n  1 x Replacement filter unit          EUR 584.88\n\nThe amount of EUR 9,142.07 is due within 30 days of the date above.\n\nRegards,\nAccounts Receivable\n",
+    "truth": {
+      "vendor": "O'Sullivan Hardware",
+      "date": "2019-03-27",
+      "total": 9142.07,
+      "currency": "EUR",
+      "po_number": "PO-56558"
+    },
+    "meta": {
+      "template": 3,
+      "date_style": 0,
+      "amount_style": 1
+    }
+  },
+  {
+    "id": "doc-0009",
+    "document": "Riverside Print Co\nUnit 4, 53 Abbey Street\nGalway\nIreland\n\nDear Customer,\n\nPlease find enclosed our invoice dated 15-Mar-98 under purchase order PO-58845.\n\n  8 x Safety gloves (box of 50)        EUR 347.38\n  4 x Toner cartridge HP-26X           EUR 83.57\n\nThe amount of \u20ac 2,971.77 is due within 30 days of the date above.\n\nRegards,\nAccounts Receivable\n",
+    "truth": {
+      "vendor": "Riverside Print Co",
+      "date": "1998-03-15",
+      "total": 2971.77,
+      "currency": "EUR",
+      "po_number": "PO-58845"
+    },
+    "meta": {
+      "template": 3,
+      "date_style": 4,
+      "amount_style": 4
+    }
+  },
+  {
+    "id": "doc-0010",
+    "document": "Fitzgerald Timber\nUnit 4, 58 Bridge Street\nCork\nIreland\n\nDear Customer,\n\nPlease find enclosed our invoice dated 12/07/1998 under purchase order PO-71121.\n\n  12 x Site survey, half day            GBP 311.86\n  6 x Signage, 3 panels                GBP 550.12\n  4 x Safety gloves (box of 50)        GBP 554.06\n  5 x Cable ties 200mm                 GBP 105.06\n\nThe amount of 3.949,97 GBP is due within 30 days of the date above.\n\nRegards,\nAccounts Receivable\n",
+    "truth": {
+      "vendor": "Fitzgerald Timber",
+      "date": "1998-07-12",
+      "total": 3949.97,
+      "currency": "GBP",
+      "po_number": "PO-71121"
+    },
+    "meta": {
+      "template": 3,
+      "date_style": 1,
+      "amount_style": 3
+    }
+  },
+  {
+    "id": "doc-0011",
+    "document": "INVOICE\n\nFrom: Saoirse Design Studio\n45 Abbey Street\nLimerick\n\nInvoice date: 8 Jan 2023\nPO Number: PO-35558\n\n  1 x Safety gloves (box of 50)        USD 683.62\n  1 x Catering, 12 covers              USD 422.40\n\nTOTAL DUE: USD 4,588.97\n",
+    "truth": {
+      "vendor": "Saoirse Design Studio",
+      "date": "2023-01-08",
+      "total": 4588.97,
+      "currency": "USD",
+      "po_number": "PO-35558"
+    },
+    "meta": {
+      "template": 0,
+      "date_style": 2,
+      "amount_style": 1
+    }
+  },
+  {
+    "id": "doc-0012",
+    "document": "TechParts GmbH\n4 Bridge Street, Cork\n\nDated 2024-04-17\n\n  12 x Catering, 12 covers              EUR 695.78\n  5 x Replacement filter unit          EUR 616.65\n\nAMOUNT DUE \u20ac9,242.90\n\nThis is a cash sale. No purchase order was raised.\n",
+    "truth": {
+      "vendor": "TechParts GmbH",
+      "date": "2024-04-17",
+      "total": 9242.9,
+      "currency": "EUR",
+      "po_number": null
+    },
+    "meta": {
+      "template": 5,
+      "date_style": 0,
+      "amount_style": 0
+    }
+  },
+  {
+    "id": "doc-0013",
+    "document": "Riverside Print Co\n73 Abbey Street, Dublin 2\n\nDated 2025-02-10\n\n  3 x Catering, 12 covers              USD 157.49\n  8 x Pallet delivery surcharge        USD 235.00\n  1 x Site survey, half day            USD 492.59\n\nAMOUNT DUE $ 469.17\n\nThis is a cash sale. No purchase order was raised.\n",
+    "truth": {
+      "vendor": "Riverside Print Co",
+      "date": "2025-02-10",
+      "total": 469.17,
+      "currency": "USD",
+      "po_number": null
+    },
+    "meta": {
+      "template": 5,
+      "date_style": 0,
+      "amount_style": 4
+    }
+  },
+  {
+    "id": "doc-0014",
+    "document": "*** REMITTANCE ADVICE ***\nSupplier ..... Clearwater Sanitation\nOur ref ...... PO-65041\nDate issued .. June 1, 2024\n\n  6 x Cable ties 200mm                 USD 419.49\n\nBalance to pay:  5,325.09 USD\nPlease quote the reference above when paying.\n",
+    "truth": {
+      "vendor": "Clearwater Sanitation",
+      "date": "2024-06-01",
+      "total": 5325.09,
+      "currency": "USD",
+      "po_number": "PO-65041"
+    },
+    "meta": {
+      "template": 2,
+      "date_style": 3,
+      "amount_style": 2
+    }
+  },
+  {
+    "id": "doc-0015",
+    "document": "Saoirse Design Studio\n27 Mill Street, Cork\n\nDated October 18, 2025\n\n  1 x A4 paper, 5 reams                USD 807.92\n  10 x Pallet delivery surcharge        USD 648.77\n  2 x A4 paper, 5 reams                USD 383.28\n  4 x Toner cartridge HP-26X           USD 58.31\n\nAMOUNT DUE 4.477,62 USD\n\nThis is a cash sale. No purchase order was raised.\n",
+    "truth": {
+      "vendor": "Saoirse Design Studio",
+      "date": "2025-10-18",
+      "total": 4477.62,
+      "currency": "USD",
+      "po_number": null
+    },
+    "meta": {
+      "template": 5,
+      "date_style": 3,
+      "amount_style": 3
+    }
+  },
+  {
+    "id": "doc-0016",
+    "document": "TechParts GmbH\nGalway\n\nInvoice date : 23-Feb-24\nPayment due  : 23-Mar-24\nOrder ref    : PO-48481\n\n  6 x Catering, 12 covers              EUR 413.12\n\nSubtotal     : \u20ac5,556.01\nVAT @ 23%    : \u20ac1,277.89\nTotal        : \u20ac6,833.90\n",
+    "truth": {
+      "vendor": "TechParts GmbH",
+      "date": "2024-02-23",
+      "total": 6833.9,
+      "currency": "EUR",
+      "po_number": "PO-48481"
+    },
+    "meta": {
+      "template": 4,
+      "date_style": 4,
+      "amount_style": 0
+    }
+  },
+  {
+    "id": "doc-0017",
+    "document": "Saoirse Design Studio\nCork\n\nInvoice date : 01.09.2025\nPayment due  : 01.10.2025\nOrder ref    : PO-59712\n\n  2 x Safety gloves (box of 50)        GBP 304.48\n  5 x Pallet delivery surcharge        GBP 28.06\n  11 x Safety gloves (box of 50)        GBP 51.16\n  11 x Cable ties 200mm                 GBP 720.15\n\nSubtotal     : \u00a33,945.30\nVAT @ 23%    : \u00a3907.43\nTotal        : \u00a34,852.73\n",
+    "truth": {
+      "vendor": "Saoirse Design Studio",
+      "date": "2025-09-01",
+      "total": 4852.73,
+      "currency": "GBP",
+      "po_number": "PO-59712"
+    },
+    "meta": {
+      "template": 4,
+      "date_style": 5,
+      "amount_style": 0
+    }
+  },
+  {
+    "id": "doc-0018",
+    "document": "Northgate Supplies\nUnit 4, 5 Quay Street\nDublin 2\nIreland\n\nDear Customer,\n\nPlease find enclosed our invoice dated April 6, 2024 under purchase order PO-86966.\n\n  1 x Safety gloves (box of 50)        GBP 560.13\n\nThe amount of GBP 655.50 is due within 30 days of the date above.\n\nRegards,\nAccounts Receivable\n",
+    "truth": {
+      "vendor": "Northgate Supplies",
+      "date": "2024-04-06",
+      "total": 655.5,
+      "currency": "GBP",
+      "po_number": "PO-86966"
+    },
+    "meta": {
+      "template": 3,
+      "date_style": 3,
+      "amount_style": 1
+    }
+  },
+  {
+    "id": "doc-0019",
+    "document": "REMlTTANCE\nSupplier: Northgate Supplies\nAccount no. 447157145300092\nDate: 12.04.2024\nRef: PO-52298\n\n  10 x Pallet delivery surcharge        GBP 219.16\n\nTotal payable ..... 7,503.82 GBP\n",
+    "truth": {
+      "vendor": "Northgate Supplies",
+      "date": "2024-04-12",
+      "total": 7503.82,
+      "currency": "GBP",
+      "po_number": "PO-52298"
+    },
+    "meta": {
+      "template": 6,
+      "date_style": 5,
+      "amount_style": 2
+    }
+  },
+  {
+    "id": "doc-0020",
+    "document": "PURCHASE ORDER CONFIRMATION\n============================\nVENDOR      : O'Sullivan Hardware\nPO REF      : PO-46785\nDATE        : 19-Dec-25\nLOCATION    : Dublin 2\n----------------------------\n  12 x A4 paper, 5 reams                USD 368.21\n----------------------------\nGRAND TOTAL : $2,206.04\n",
+    "truth": {
+      "vendor": "O'Sullivan Hardware",
+      "date": "2025-12-19",
+      "total": 2206.04,
+      "currency": "USD",
+      "po_number": "PO-46785"
+    },
+    "meta": {
+      "template": 7,
+      "date_style": 4,
+      "amount_style": 0
+    }
+  },
+  {
+    "id": "doc-0021",
+    "document": "REMlTTANCE\nSupplier: Aoife Byrne Catering\nAccount no. 447156489010092\nDate: 2023-01-17\nRef: PO-12943\n\n  12 x Toner cartridge HP-26X           GBP 522.33\n  2 x Catering, 12 covers              GBP 473.21\n  6 x Signage, 3 panels                GBP 847.86\n  10 x Pallet delivery surcharge        GBP 430.87\n\nTotal payable ..... \u00a3 8,333.16\n",
+    "truth": {
+      "vendor": "Aoife Byrne Catering",
+      "date": "2023-01-17",
+      "total": 8333.16,
+      "currency": "GBP",
+      "po_number": "PO-12943"
+    },
+    "meta": {
+      "template": 6,
+      "date_style": 0,
+      "amount_style": 4
+    }
+  },
+  {
+    "id": "doc-0022",
+    "document": "Aoife Byrne Catering\n59 Bridge Street, Galway\n\nDated 24/03/2023\n\n  1 x Pallet delivery surcharge        GBP 354.18\n\nAMOUNT DUE GBP 6,242.90\n\nThis is a cash sale. No purchase order was raised.\n",
+    "truth": {
+      "vendor": "Aoife Byrne Catering",
+      "date": "2023-03-24",
+      "total": 6242.9,
+      "currency": "GBP",
+      "po_number": null
+    },
+    "meta": {
+      "template": 5,
+      "date_style": 1,
+      "amount_style": 1
+    }
+  },
+  {
+    "id": "doc-0023",
+    "document": "*** REMITTANCE ADVICE ***\nSupplier ..... Riverside Print Co\nOur ref ...... PO-79512\nDate issued .. 14/01/2025\n\n  3 x Site survey, half day            EUR 99.40\n  12 x A4 paper, 5 reams                EUR 443.47\n  8 x Cable ties 200mm                 EUR 239.57\n  10 x A4 paper, 5 reams                EUR 757.28\n\nBalance to pay:  \u20ac7,679.46\nPlease quote the reference above when paying.\n",
+    "truth": {
+      "vendor": "Riverside Print Co",
+      "date": "2025-01-14",
+      "total": 7679.46,
+      "currency": "EUR",
+      "po_number": "PO-79512"
+    },
+    "meta": {
+      "template": 2,
+      "date_style": 1,
+      "amount_style": 0
+    }
+  },
+  {
+    "id": "doc-0024",
+    "document": "PURCHASE ORDER CONFIRMATION\n============================\nVENDOR      : Riverside Print Co\nPO REF      : PO-71563\nDATE        : 19.06.2025\nLOCATION    : Galway\n----------------------------\n  6 x Signage, 3 panels                USD 354.08\n  2 x Cable ties 200mm                 USD 792.59\n----------------------------\nGRAND TOTAL : 4.296,26 USD\n",
+    "truth": {
+      "vendor": "Riverside Print Co",
+      "date": "2025-06-19",
+      "total": 4296.26,
+      "currency": "USD",
+      "po_number": "PO-71563"
+    },
+    "meta": {
+      "template": 7,
+      "date_style": 5,
+      "amount_style": 3
+    }
+  },
+  {
+    "id": "doc-0025",
+    "document": "*** REMITTANCE ADVICE ***\nSupplier ..... TechParts GmbH\nOur ref ...... PO-76119\nDate issued .. 07-Jan-98\n\n  4 x Cable ties 200mm                 USD 257.68\n\nBalance to pay:  8.596,27 USD\nPlease quote the reference above when paying.\n",
+    "truth": {
+      "vendor": "TechParts GmbH",
+      "date": "1998-01-07",
+      "total": 8596.27,
+      "currency": "USD",
+      "po_number": "PO-76119"
+    },
+    "meta": {
+      "template": 2,
+      "date_style": 4,
+      "amount_style": 3
+    }
+  },
+  {
+    "id": "doc-0026",
+    "document": "INVOICE\n\nFrom: Donnelly Electrical\n99 Bridge Street\nDublin 2\n\nInvoice date: March 26, 2025\nPO Number: PO-45967\n\n  3 x Toner cartridge HP-26X           GBP 400.20\n  4 x Pallet delivery surcharge        GBP 385.79\n\nTOTAL DUE: 3,561.20 GBP\n",
+    "truth": {
+      "vendor": "Donnelly Electrical",
+      "date": "2025-03-26",
+      "total": 3561.2,
+      "currency": "GBP",
+      "po_number": "PO-45967"
+    },
+    "meta": {
+      "template": 0,
+      "date_style": 3,
+      "amount_style": 2
+    }
+  },
+  {
+    "id": "doc-0027",
+    "document": "PURCHASE ORDER CONFIRMATION\n============================\nVENDOR      : Donnelly Electrical\nPO REF      : PO-78686\nDATE        : 7 Apr 2025\nLOCATION    : Cork\n----------------------------\n  5 x Site survey, half day            EUR 568.47\n----------------------------\nGRAND TOTAL : 5,652.76 EUR\n",
+    "truth": {
+      "vendor": "Donnelly Electrical",
+      "date": "2025-04-07",
+      "total": 5652.76,
+      "currency": "EUR",
+      "po_number": "PO-78686"
+    },
+    "meta": {
+      "template": 7,
+      "date_style": 2,
+      "amount_style": 2
+    }
+  },
+  {
+    "id": "doc-0028",
+    "document": "Kelleher & Sons Ltd\nUnit 4, 35 Abbey Street\nDublin 2\nIreland\n\nDear Customer,\n\nPlease find enclosed our invoice dated 2019-08-24 under purchase order PO-11247.\n\n  11 x Safety gloves (box of 50)        EUR 360.71\n  2 x Safety gloves (box of 50)        EUR 132.16\n  8 x Safety gloves (box of 50)        EUR 696.91\n  4 x Replacement filter unit          EUR 392.49\n\nThe amount of 9,214.64 EUR is due within 30 days of the date above.\n\nRegards,\nAccounts Receivable\n",
+    "truth": {
+      "vendor": "Kelleher & Sons Ltd",
+      "date": "2019-08-24",
+      "total": 9214.64,
+      "currency": "EUR",
+      "po_number": "PO-11247"
+    },
+    "meta": {
+      "template": 3,
+      "date_style": 0,
+      "amount_style": 2
+    }
+  },
+  {
+    "id": "doc-0029",
+    "document": "Kelleher & Sons Ltd\n21 Abbey Street, Dublin 2\n\nDated 07.10.2025\n\n  6 x Cable ties 200mm                 USD 344.67\n  4 x Toner cartridge HP-26X           USD 115.30\n\nAMOUNT DUE 5.463,25 USD\n\nThis is a cash sale. No purchase order was raised.\n",
+    "truth": {
+      "vendor": "Kelleher & Sons Ltd",
+      "date": "2025-10-07",
+      "total": 5463.25,
+      "currency": "USD",
+      "po_number": null
+    },
+    "meta": {
+      "template": 5,
+      "date_style": 5,
+      "amount_style": 3
+    }
+  },
+  {
+    "id": "doc-0030",
+    "document": "*** REMITTANCE ADVICE ***\nSupplier ..... Saoirse Design Studio\nOur ref ...... PO-20941\nDate issued .. 2019-11-21\n\n  5 x Cable ties 200mm                 USD 232.52\n  1 x Signage, 3 panels                USD 342.43\n  11 x Replacement filter unit          USD 165.50\n\nBalance to pay:  3.090,52 USD\nPlease quote the reference above when paying.\n",
+    "truth": {
+      "vendor": "Saoirse Design Studio",
+      "date": "2019-11-21",
+      "total": 3090.52,
+      "currency": "USD",
+      "po_number": "PO-20941"
+    },
+    "meta": {
+      "template": 2,
+      "date_style": 0,
+      "amount_style": 3
+    }
+  },
+  {
+    "id": "doc-0031",
+    "document": "INVOICE\n\nFrom: Clearwater Sanitation\n24 Mill Street\nLimerick\n\nInvoice date: March 26, 1998\nPO Number: PO-87018\n\n  4 x A4 paper, 5 reams                USD 259.73\n\nTOTAL DUE: $8,696.08\n",
+    "truth": {
+      "vendor": "Clearwater Sanitation",
+      "date": "1998-03-26",
+      "total": 8696.08,
+      "currency": "USD",
+      "po_number": "PO-87018"
+    },
+    "meta": {
+      "template": 0,
+      "date_style": 3,
+      "amount_style": 0
+    }
+  },
+  {
+    "id": "doc-0032",
+    "document": "Donnelly Electrical\nDublin 2 | VAT IE3119328\n\nAmount payable 2,596.03 EUR\nRef PO-16663   Dated 12.08.2024\n\nItems:\n  6 x Pallet delivery surcharge        EUR 386.17\n  4 x Replacement filter unit          EUR 47.39\n  2 x A4 paper, 5 reams                EUR 222.40\n  1 x Cable ties 200mm                 EUR 52.78\n",
+    "truth": {
+      "vendor": "Donnelly Electrical",
+      "date": "2024-08-12",
+      "total": 2596.03,
+      "currency": "EUR",
+      "po_number": "PO-16663"
+    },
+    "meta": {
+      "template": 1,
+      "date_style": 5,
+      "amount_style": 2
+    }
+  },
+  {
+    "id": "doc-0033",
+    "document": "REMlTTANCE\nSupplier: Donnelly Electrical\nAccount no. 447142722220092\nDate: May 20, 2025\nRef: PO-44420\n\n  7 x Signage, 3 panels                USD 590.95\n  6 x Signage, 3 panels                USD 324.85\n  7 x Cable ties 200mm                 USD 402.02\n\nTotal payable ..... $5,368.79\n",
+    "truth": {
+      "vendor": "Donnelly Electrical",
+      "date": "2025-05-20",
+      "total": 5368.79,
+      "currency": "USD",
+      "po_number": "PO-44420"
+    },
+    "meta": {
+      "template": 6,
+      "date_style": 3,
+      "amount_style": 0
+    }
+  },
+  {
+    "id": "doc-0034",
+    "document": "REMlTTANCE\nSupplier: O'Sullivan Hardware\nAccount no. 447183951220092\nDate: 4 Mar 2025\nRef: PO-45327\n\n  7 x Cable ties 200mm                 USD 810.11\n  1 x Signage, 3 panels                USD 384.52\n  12 x Pallet delivery surcharge        USD 133.36\n\nTotal payable ..... $ 5,440.52\n",
+    "truth": {
+      "vendor": "O'Sullivan Hardware",
+      "date": "2025-03-04",
+      "total": 5440.52,
+      "currency": "USD",
+      "po_number": "PO-45327"
+    },
+    "meta": {
+      "template": 6,
+      "date_style": 2,
+      "amount_style": 4
+    }
+  },
+  {
+    "id": "doc-0035",
+    "document": "PURCHASE ORDER CONFIRMATION\n============================\nVENDOR      : Aoife Byrne Catering\nPO REF      : PO-37841\nDATE        : November 14, 2025\nLOCATION    : Belfast\n----------------------------\n  2 x Replacement filter unit          USD 183.97\n  2 x Catering, 12 covers              USD 293.78\n----------------------------\nGRAND TOTAL : $208.18\n",
+    "truth": {
+      "vendor": "Aoife Byrne Catering",
+      "date": "2025-11-14",
+      "total": 208.18,
+      "currency": "USD",
+      "po_number": "PO-37841"
+    },
+    "meta": {
+      "template": 7,
+      "date_style": 3,
+      "amount_style": 0
+    }
+  },
+  {
+    "id": "doc-0036",
+    "document": "*** REMITTANCE ADVICE ***\nSupplier ..... Blue Harbour Logistics\nOur ref ...... PO-94252\nDate issued .. 2019-12-23\n\n  3 x Signage, 3 panels                USD 802.89\n  11 x A4 paper, 5 reams                USD 418.05\n\nBalance to pay:  $ 2,767.92\nPlease quote the reference above when paying.\n",
+    "truth": {
+      "vendor": "Blue Harbour Logistics",
+      "date": "2019-12-23",
+      "total": 2767.92,
+      "currency": "USD",
+      "po_number": "PO-94252"
+    },
+    "meta": {
+      "template": 2,
+      "date_style": 0,
+      "amount_style": 4
+    }
+  },
+  {
+    "id": "doc-0037",
+    "document": "PURCHASE ORDER CONFIRMATION\n============================\nVENDOR      : Riverside Print Co\nPO REF      : PO-43398\nDATE        : 15.10.2024\nLOCATION    : Dublin 2\n----------------------------\n  6 x Cable ties 200mm                 EUR 291.24\n  8 x Signage, 3 panels                EUR 153.89\n  6 x Replacement filter unit          EUR 278.16\n----------------------------\nGRAND TOTAL : 6.098,70 EUR\n",
+    "truth": {
+      "vendor": "Riverside Print Co",
+      "date": "2024-10-15",
+      "total": 6098.7,
+      "currency": "EUR",
+      "po_number": "PO-43398"
+    },
+    "meta": {
+      "template": 7,
+      "date_style": 5,
+      "amount_style": 3
+    }
+  },
+  {
+    "id": "doc-0038",
+    "document": "Fitzgerald Timber\nDublin 2\n\nInvoice date : 14.12.1998\nPayment due  : 14.01.1999\nOrder ref    : PO-73668\n\n  4 x Toner cartridge HP-26X           USD 859.74\n  6 x Pallet delivery surcharge        USD 294.58\n  2 x Safety gloves (box of 50)        USD 321.92\n  7 x Toner cartridge HP-26X           USD 374.14\n\nSubtotal     : 3,508.28 USD\nVAT @ 23%    : 806.91 USD\nTotal        : 4,315.19 USD\n",
+    "truth": {
+      "vendor": "Fitzgerald Timber",
+      "date": "1998-12-14",
+      "total": 4315.19,
+      "currency": "USD",
+      "po_number": "PO-73668"
+    },
+    "meta": {
+      "template": 4,
+      "date_style": 5,
+      "amount_style": 2
+    }
+  },
+  {
+    "id": "doc-0039",
+    "document": "PURCHASE ORDER CONFIRMATION\n============================\nVENDOR      : Fitzgerald Timber\nPO REF      : PO-19308\nDATE        : December 6, 2019\nLOCATION    : Galway\n----------------------------\n  11 x Catering, 12 covers              EUR 765.40\n----------------------------\nGRAND TOTAL : 1,626.09 EUR\n",
+    "truth": {
+      "vendor": "Fitzgerald Timber",
+      "date": "2019-12-06",
+      "total": 1626.09,
+      "currency": "EUR",
+      "po_number": "PO-19308"
+    },
+    "meta": {
+      "template": 7,
+      "date_style": 3,
+      "amount_style": 2
+    }
+  },
+  {
+    "id": "doc-0040",
+    "document": "INVOICE\n\nFrom: Fitzgerald Timber\n2 Mill Street\nLimerick\n\nInvoice date: 2024-07-05\nPO Number: PO-76152\n\n  12 x Replacement filter unit          USD 834.85\n  1 x Safety gloves (box of 50)        USD 74.68\n\nTOTAL DUE: USD 4,949.66\n",
+    "truth": {
+      "vendor": "Fitzgerald Timber",
+      "date": "2024-07-05",
+      "total": 4949.66,
+      "currency": "USD",
+      "po_number": "PO-76152"
+    },
+    "meta": {
+      "template": 0,
+      "date_style": 0,
+      "amount_style": 1
+    }
+  },
+  {
+    "id": "doc-0041",
+    "document": "O'Sullivan Hardware\nUnit 4, 43 Quay Street\nGalway\nIreland\n\nDear Customer,\n\nPlease find enclosed our invoice dated 19-Nov-19 under purchase order PO-27939.\n\n  4 x Site survey, half day            USD 314.05\n  11 x Toner cartridge HP-26X           USD 43.47\n  6 x Cable ties 200mm                 USD 279.35\n\nThe amount of USD 648.31 is due within 30 days of the date above.\n\nRegards,\nAccounts Receivable\n",
+    "truth": {
+      "vendor": "O'Sullivan Hardware",
+      "date": "2019-11-19",
+      "total": 648.31,
+      "currency": "USD",
+      "po_number": "PO-27939"
+    },
+    "meta": {
+      "template": 3,
+      "date_style": 4,
+      "amount_style": 1
+    }
+  },
+  {
+    "id": "doc-0042",
+    "document": "REMlTTANCE\nSupplier: Aoife Byrne Catering\nAccount no. 447127387170092\nDate: May 23, 2023\nRef: PO-27063\n\n  3 x Catering, 12 covers              USD 726.50\n  6 x Pallet delivery surcharge        USD 397.47\n  5 x Safety gloves (box of 50)        USD 649.63\n\nTotal payable ..... $ 7,694.95\n",
+    "truth": {
+      "vendor": "Aoife Byrne Catering",
+      "date": "2023-05-23",
+      "total": 7694.95,
+      "currency": "USD",
+      "po_number": "PO-27063"
+    },
+    "meta": {
+      "template": 6,
+      "date_style": 3,
+      "amount_style": 4
+    }
+  },
+  {
+    "id": "doc-0043",
+    "document": "*** REMITTANCE ADVICE ***\nSupplier ..... Saoirse Design Studio\nOur ref ...... PO-67044\nDate issued .. 26/06/1998\n\n  11 x Signage, 3 panels                USD 95.92\n  1 x Pallet delivery surcharge        USD 828.69\n  9 x Pallet delivery surcharge        USD 336.10\n  6 x Pallet delivery surcharge        USD 795.21\n\nBalance to pay:  $3,921.69\nPlease quote the reference above when paying.\n",
+    "truth": {
+      "vendor": "Saoirse Design Studio",
+      "date": "1998-06-26",
+      "total": 3921.69,
+      "currency": "USD",
+      "po_number": "PO-67044"
+    },
+    "meta": {
+      "template": 2,
+      "date_style": 1,
+      "amount_style": 0
+    }
+  },
+  {
+    "id": "doc-0044",
+    "document": "INVOICE\n\nFrom: TechParts GmbH\n52 Quay Street\nBelfast\n\nInvoice date: September 27, 2025\nPO Number: PO-68427\n\n  12 x A4 paper, 5 reams                EUR 763.10\n  4 x Toner cartridge HP-26X           EUR 70.29\n  6 x Site survey, half day            EUR 861.95\n  2 x Pallet delivery surcharge        EUR 619.08\n\nTOTAL DUE: EUR 1,953.43\n",
+    "truth": {
+      "vendor": "TechParts GmbH",
+      "date": "2025-09-27",
+      "total": 1953.43,
+      "currency": "EUR",
+      "po_number": "PO-68427"
+    },
+    "meta": {
+      "template": 0,
+      "date_style": 3,
+      "amount_style": 1
+    }
+  },
+  {
+    "id": "doc-0045",
+    "document": "PURCHASE ORDER CONFIRMATION\n============================\nVENDOR      : Northgate Supplies\nPO REF      : PO-21027\nDATE        : 21/04/1998\nLOCATION    : Galway\n----------------------------\n  10 x Site survey, half day            USD 333.88\n  12 x Signage, 3 panels                USD 261.65\n  9 x Pallet delivery surcharge        USD 743.29\n  6 x Cable ties 200mm                 USD 226.54\n----------------------------\nGRAND TOTAL : USD 2,563.22\n",
+    "truth": {
+      "vendor": "Northgate Supplies",
+      "date": "1998-04-21",
+      "total": 2563.22,
+      "currency": "USD",
+      "po_number": "PO-21027"
+    },
+    "meta": {
+      "template": 7,
+      "date_style": 1,
+      "amount_style": 1
+    }
+  },
+  {
+    "id": "doc-0046",
+    "document": "Donnelly Electrical\nUnit 4, 64 Bridge Street\nBelfast\nIreland\n\nDear Customer,\n\nPlease find enclosed our invoice dated 18 Jul 2024 under purchase order PO-97187.\n\n  5 x Signage, 3 panels                EUR 742.44\n  10 x Site survey, half day            EUR 389.00\n  6 x Replacement filter unit          EUR 245.22\n  4 x Cable ties 200mm                 EUR 543.10\n\nThe amount of \u20ac7,144.30 is due within 30 days of the date above.\n\nRegards,\nAccounts Receivable\n",
+    "truth": {
+      "vendor": "Donnelly Electrical",
+      "date": "2024-07-18",
+      "total": 7144.3,
+      "currency": "EUR",
+      "po_number": "PO-97187"
+    },
+    "meta": {
+      "template": 3,
+      "date_style": 2,
+      "amount_style": 0
+    }
+  },
+  {
+    "id": "doc-0047",
+    "document": "Riverside Print Co\nGalway\n\nInvoice date : 2024-08-15\nPayment due  : 2024-09-15\nOrder ref    : PO-70624\n\n  10 x Site survey, half day            USD 595.02\n  10 x Cable ties 200mm                 USD 579.94\n\nSubtotal     : USD 2,073.83\nVAT @ 23%    : USD 476.99\nTotal        : USD 2,550.82\n",
+    "truth": {
+      "vendor": "Riverside Print Co",
+      "date": "2024-08-15",
+      "total": 2550.82,
+      "currency": "USD",
+      "po_number": "PO-70624"
+    },
+    "meta": {
+      "template": 4,
+      "date_style": 0,
+      "amount_style": 1
+    }
+  },
+  {
+    "id": "doc-0048",
+    "document": "PURCHASE ORDER CONFIRMATION\n============================\nVENDOR      : Blue Harbour Logistics\nPO REF      : PO-16673\nDATE        : 6 Jan 2024\nLOCATION    : Galway\n----------------------------\n  5 x Safety gloves (box of 50)        GBP 178.32\n  12 x Pallet delivery surcharge        GBP 383.39\n  3 x A4 paper, 5 reams                GBP 312.78\n  6 x A4 paper, 5 reams                GBP 128.75\n----------------------------\nGRAND TOTAL : \u00a3 5,771.84\n",
+    "truth": {
+      "vendor": "Blue Harbour Logistics",
+      "date": "2024-01-06",
+      "total": 5771.84,
+      "currency": "GBP",
+      "po_number": "PO-16673"
+    },
+    "meta": {
+      "template": 7,
+      "date_style": 2,
+      "amount_style": 4
+    }
+  },
+  {
+    "id": "doc-0049",
+    "document": "Saoirse Design Studio\nUnit 4, 70 Bridge Street\nWaterford\nIreland\n\nDear Customer,\n\nPlease find enclosed our invoice dated 14-Dec-19 under purchase order PO-68964.\n\n  2 x Replacement filter unit          USD 370.15\n  4 x A4 paper, 5 reams                USD 804.59\n  4 x Toner cartridge HP-26X           USD 52.21\n  5 x Replacement filter unit          USD 105.93\n\nThe amount of 6.759,25 USD is due within 30 days of the date above.\n\nRegards,\nAccounts Receivable\n",
+    "truth": {
+      "vendor": "Saoirse Design Studio",
+      "date": "2019-12-14",
+      "total": 6759.25,
+      "currency": "USD",
+      "po_number": "PO-68964"
+    },
+    "meta": {
+      "template": 3,
+      "date_style": 4,
+      "amount_style": 3
+    }
+  },
+  {
+    "id": "doc-0050",
+    "document": "Aoife Byrne Catering\nUnit 4, 79 Mill Street\nDublin 2\nIreland\n\nDear Customer,\n\nPlease find enclosed our invoice dated 23 Feb 2019 under purchase order PO-22905.\n\n  6 x Signage, 3 panels                USD 569.80\n  2 x Cable ties 200mm                 USD 59.08\n\nThe amount of 8,823.34 USD is due within 30 days of the date above.\n\nRegards,\nAccounts Receivable\n",
+    "truth": {
+      "vendor": "Aoife Byrne Catering",
+      "date": "2019-02-23",
+      "total": 8823.34,
+      "currency": "USD",
+      "po_number": "PO-22905"
+    },
+    "meta": {
+      "template": 3,
+      "date_style": 2,
+      "amount_style": 2
+    }
+  },
+  {
+    "id": "doc-0051",
+    "document": "REMlTTANCE\nSupplier: Saoirse Design Studio\nAccount no. 447134871300092\nDate: June 17, 2025\nRef: PO-56100\n\n  11 x A4 paper, 5 reams                USD 104.35\n  11 x Catering, 12 covers              USD 751.58\n  4 x Replacement filter unit          USD 156.82\n\nTotal payable ..... 6.598,58 USD\n",
+    "truth": {
+      "vendor": "Saoirse Design Studio",
+      "date": "2025-06-17",
+      "total": 6598.58,
+      "currency": "USD",
+      "po_number": "PO-56100"
+    },
+    "meta": {
+      "template": 6,
+      "date_style": 3,
+      "amount_style": 3
+    }
+  },
+  {
+    "id": "doc-0052",
+    "document": "INVOICE\n\nFrom: Riverside Print Co\n49 Mill Street\nCork\n\nInvoice date: November 1, 2024\nPO Number: PO-62843\n\n  7 x Cable ties 200mm                 EUR 740.10\n  6 x Safety gloves (box of 50)        EUR 30.09\n  11 x Signage, 3 panels                EUR 80.14\n\nTOTAL DUE: \u20ac 8,219.86\n",
+    "truth": {
+      "vendor": "Riverside Print Co",
+      "date": "2024-11-01",
+      "total": 8219.86,
+      "currency": "EUR",
+      "po_number": "PO-62843"
+    },
+    "meta": {
+      "template": 0,
+      "date_style": 3,
+      "amount_style": 4
+    }
+  },
+  {
+    "id": "doc-0053",
+    "document": "Fitzgerald Timber\nUnit 4, 86 Mill Street\nWaterford\nIreland\n\nDear Customer,\n\nPlease find enclosed our invoice dated 22.10.2019 under purchase order PO-94909.\n\n  10 x Pallet delivery surcharge        GBP 298.92\n\nThe amount of GBP 7,384.04 is due within 30 days of the date above.\n\nRegards,\nAccounts Receivable\n",
+    "truth": {
+      "vendor": "Fitzgerald Timber",
+      "date": "2019-10-22",
+      "total": 7384.04,
+      "currency": "GBP",
+      "po_number": "PO-94909"
+    },
+    "meta": {
+      "template": 3,
+      "date_style": 5,
+      "amount_style": 1
+    }
+  },
+  {
+    "id": "doc-0054",
+    "document": "Fitzgerald Timber\nUnit 4, 86 Quay Street\nLimerick\nIreland\n\nDear Customer,\n\nPlease find enclosed our invoice dated 07.01.2023 under purchase order PO-79913.\n\n  8 x Signage, 3 panels                USD 88.24\n\nThe amount of USD 6,231.03 is due within 30 days of the date above.\n\nRegards,\nAccounts Receivable\n",
+    "truth": {
+      "vendor": "Fitzgerald Timber",
+      "date": "2023-01-07",
+      "total": 6231.03,
+      "currency": "USD",
+      "po_number": "PO-79913"
+    },
+    "meta": {
+      "template": 3,
+      "date_style": 5,
+      "amount_style": 1
+    }
+  },
+  {
+    "id": "doc-0055",
+    "document": "PURCHASE ORDER CONFIRMATION\n============================\nVENDOR      : Riverside Print Co\nPO REF      : PO-88316\nDATE        : 22-Mar-23\nLOCATION    : Limerick\n----------------------------\n  4 x Site survey, half day            GBP 715.93\n----------------------------\nGRAND TOTAL : GBP 7,054.87\n",
+    "truth": {
+      "vendor": "Riverside Print Co",
+      "date": "2023-03-22",
+      "total": 7054.87,
+      "currency": "GBP",
+      "po_number": "PO-88316"
+    },
+    "meta": {
+      "template": 7,
+      "date_style": 4,
+      "amount_style": 1
+    }
+  },
+  {
+    "id": "doc-0056",
+    "document": "O'Sullivan Hardware\nLimerick\n\nInvoice date : June 24, 2025\nPayment due  : July 24, 2025\nOrder ref    : PO-53466\n\n  10 x Replacement filter unit          USD 721.89\n  5 x A4 paper, 5 reams                USD 414.21\n  10 x Replacement filter unit          USD 731.46\n  6 x Replacement filter unit          USD 247.79\n\nSubtotal     : $396.39\nVAT @ 23%    : $91.18\nTotal        : $487.57\n",
+    "truth": {
+      "vendor": "O'Sullivan Hardware",
+      "date": "2025-06-24",
+      "total": 487.57,
+      "currency": "USD",
+      "po_number": "PO-53466"
+    },
+    "meta": {
+      "template": 4,
+      "date_style": 3,
+      "amount_style": 0
+    }
+  },
+  {
+    "id": "doc-0057",
+    "document": "*** REMITTANCE ADVICE ***\nSupplier ..... Northgate Supplies\nOur ref ...... PO-13315\nDate issued .. June 24, 2019\n\n  3 x Site survey, half day            GBP 839.69\n\nBalance to pay:  \u00a3 2,377.84\nPlease quote the reference above when paying.\n",
+    "truth": {
+      "vendor": "Northgate Supplies",
+      "date": "2019-06-24",
+      "total": 2377.84,
+      "currency": "GBP",
+      "po_number": "PO-13315"
+    },
+    "meta": {
+      "template": 2,
+      "date_style": 3,
+      "amount_style": 4
+    }
+  },
+  {
+    "id": "doc-0058",
+    "document": "*** REMITTANCE ADVICE ***\nSupplier ..... Aoife Byrne Catering\nOur ref ...... PO-57811\nDate issued .. 15.08.2019\n\n  1 x A4 paper, 5 reams                GBP 500.06\n\nBalance to pay:  1.810,68 GBP\nPlease quote the reference above when paying.\n",
+    "truth": {
+      "vendor": "Aoife Byrne Catering",
+      "date": "2019-08-15",
+      "total": 1810.68,
+      "currency": "GBP",
+      "po_number": "PO-57811"
+    },
+    "meta": {
+      "template": 2,
+      "date_style": 5,
+      "amount_style": 3
+    }
+  },
+  {
+    "id": "doc-0059",
+    "document": "PURCHASE ORDER CONFIRMATION\n============================\nVENDOR      : Meridian Office Services\nPO REF      : PO-50184\nDATE        : 27.08.2025\nLOCATION    : Galway\n----------------------------\n  12 x Site survey, half day            GBP 787.27\n  3 x Pallet delivery surcharge        GBP 830.78\n----------------------------\nGRAND TOTAL : \u00a3 5,303.72\n",
+    "truth": {
+      "vendor": "Meridian Office Services",
+      "date": "2025-08-27",
+      "total": 5303.72,
+      "currency": "GBP",
+      "po_number": "PO-50184"
+    },
+    "meta": {
+      "template": 7,
+      "date_style": 5,
+      "amount_style": 4
+    }
+  },
+  {
+    "id": "doc-0060",
+    "document": "REMlTTANCE\nSupplier: Kelleher & Sons Ltd\nAccount no. 447158534060092\nDate: 1998-06-21\nRef: PO-47090\n\n  6 x A4 paper, 5 reams                GBP 772.65\n\nTotal payable ..... 6.807,40 GBP\n",
+    "truth": {
+      "vendor": "Kelleher & Sons Ltd",
+      "date": "1998-06-21",
+      "total": 6807.4,
+      "currency": "GBP",
+      "po_number": "PO-47090"
+    },
+    "meta": {
+      "template": 6,
+      "date_style": 0,
+      "amount_style": 3
+    }
+  },
+  {
+    "id": "doc-0061",
+    "document": "Blue Harbour Logistics\n86 Bridge Street, Galway\n\nDated 1 Aug 1998\n\n  7 x Replacement filter unit          USD 329.75\n  4 x Pallet delivery surcharge        USD 234.07\n  1 x Signage, 3 panels                USD 598.94\n\nAMOUNT DUE $ 7,677.66\n\nThis is a cash sale. No purchase order was raised.\n",
+    "truth": {
+      "vendor": "Blue Harbour Logistics",
+      "date": "1998-08-01",
+      "total": 7677.66,
+      "currency": "USD",
+      "po_number": null
+    },
+    "meta": {
+      "template": 5,
+      "date_style": 2,
+      "amount_style": 4
+    }
+  },
+  {
+    "id": "doc-0062",
+    "document": "O'Sullivan Hardware\nWaterford | VAT IE6393940\n\nAmount payable \u20ac7,420.68\nRef PO-20600   Dated 27.12.1998\n\nItems:\n  12 x Cable ties 200mm                 EUR 506.34\n",
+    "truth": {
+      "vendor": "O'Sullivan Hardware",
+      "date": "1998-12-27",
+      "total": 7420.68,
+      "currency": "EUR",
+      "po_number": "PO-20600"
+    },
+    "meta": {
+      "template": 1,
+      "date_style": 5,
+      "amount_style": 0
+    }
+  },
+  {
+    "id": "doc-0063",
+    "document": "INVOICE\n\nFrom: Aoife Byrne Catering\n55 Mill Street\nCork\n\nInvoice date: June 2, 1998\nPO Number: PO-88736\n\n  7 x Cable ties 200mm                 USD 816.93\n\nTOTAL DUE: USD 4,819.31\n",
+    "truth": {
+      "vendor": "Aoife Byrne Catering",
+      "date": "1998-06-02",
+      "total": 4819.31,
+      "currency": "USD",
+      "po_number": "PO-88736"
+    },
+    "meta": {
+      "template": 0,
+      "date_style": 3,
+      "amount_style": 1
+    }
+  },
+  {
+    "id": "doc-0064",
+    "document": "Donnelly Electrical\n44 Abbey Street, Dublin 2\n\nDated 11-Aug-23\n\n  11 x Cable ties 200mm                 USD 352.35\n\nAMOUNT DUE 8.146,81 USD\n\nThis is a cash sale. No purchase order was raised.\n",
+    "truth": {
+      "vendor": "Donnelly Electrical",
+      "date": "2023-08-11",
+      "total": 8146.81,
+      "currency": "USD",
+      "po_number": null
+    },
+    "meta": {
+      "template": 5,
+      "date_style": 4,
+      "amount_style": 3
+    }
+  },
+  {
+    "id": "doc-0065",
+    "document": "REMlTTANCE\nSupplier: Aoife Byrne Catering\nAccount no. 447175349960092\nDate: 1998-08-01\nRef: PO-89462\n\n  12 x Signage, 3 panels                USD 302.83\n  12 x Catering, 12 covers              USD 731.17\n  2 x Safety gloves (box of 50)        USD 711.97\n  10 x Site survey, half day            USD 827.97\n\nTotal payable ..... USD 1,474.90\n",
+    "truth": {
+      "vendor": "Aoife Byrne Catering",
+      "date": "1998-08-01",
+      "total": 1474.9,
+      "currency": "USD",
+      "po_number": "PO-89462"
+    },
+    "meta": {
+      "template": 6,
+      "date_style": 0,
+      "amount_style": 1
+    }
+  },
+  {
+    "id": "doc-0066",
+    "document": "REMlTTANCE\nSupplier: TechParts GmbH\nAccount no. 447118674130092\nDate: 2024-02-26\nRef: PO-14216\n\n  8 x Catering, 12 covers              GBP 399.97\n  3 x Pallet delivery surcharge        GBP 221.15\n  4 x Toner cartridge HP-26X           GBP 568.84\n  6 x A4 paper, 5 reams                GBP 439.79\n\nTotal payable ..... GBP 3,209.77\n",
+    "truth": {
+      "vendor": "TechParts GmbH",
+      "date": "2024-02-26",
+      "total": 3209.77,
+      "currency": "GBP",
+      "po_number": "PO-14216"
+    },
+    "meta": {
+      "template": 6,
+      "date_style": 0,
+      "amount_style": 1
+    }
+  },
+  {
+    "id": "doc-0067",
+    "document": "Aoife Byrne Catering\n70 Quay Street, Cork\n\nDated February 8, 1998\n\n  3 x Toner cartridge HP-26X           GBP 159.53\n  10 x Cable ties 200mm                 GBP 642.05\n  5 x Toner cartridge HP-26X           GBP 95.99\n  5 x Site survey, half day            GBP 341.35\n\nAMOUNT DUE GBP 8,402.39\n\nThis is a cash sale. No purchase order was raised.\n",
+    "truth": {
+      "vendor": "Aoife Byrne Catering",
+      "date": "1998-02-08",
+      "total": 8402.39,
+      "currency": "GBP",
+      "po_number": null
+    },
+    "meta": {
+      "template": 5,
+      "date_style": 3,
+      "amount_style": 1
+    }
+  },
+  {
+    "id": "doc-0068",
+    "document": "Fitzgerald Timber\nLimerick | VAT IE8824538\n\nAmount payable 1,644.49 EUR\nRef PO-55148   Dated 26 Mar 2025\n\nItems:\n  10 x Replacement filter unit          EUR 275.54\n  9 x Pallet delivery surcharge        EUR 259.19\n  12 x Signage, 3 panels                EUR 555.56\n",
+    "truth": {
+      "vendor": "Fitzgerald Timber",
+      "date": "2025-03-26",
+      "total": 1644.49,
+      "currency": "EUR",
+      "po_number": "PO-55148"
+    },
+    "meta": {
+      "template": 1,
+      "date_style": 2,
+      "amount_style": 2
+    }
+  },
+  {
+    "id": "doc-0069",
+    "document": "Saoirse Design Studio\nUnit 4, 61 Abbey Street\nBelfast\nIreland\n\nDear Customer,\n\nPlease find enclosed our invoice dated 12.03.2019 under purchase order PO-44868.\n\n  2 x Cable ties 200mm                 EUR 109.91\n  10 x Replacement filter unit          EUR 810.46\n  9 x A4 paper, 5 reams                EUR 24.21\n  7 x Replacement filter unit          EUR 288.34\n\nThe amount of 3.722,07 EUR is due within 30 days of the date above.\n\nRegards,\nAccounts Receivable\n",
+    "truth": {
+      "vendor": "Saoirse Design Studio",
+      "date": "2019-03-12",
+      "total": 3722.07,
+      "currency": "EUR",
+      "po_number": "PO-44868"
+    },
+    "meta": {
+      "template": 3,
+      "date_style": 5,
+      "amount_style": 3
+    }
+  },
+  {
+    "id": "doc-0070",
+    "document": "REMlTTANCE\nSupplier: Fitzgerald Timber\nAccount no. 447123897400092\nDate: 10.03.2023\nRef: PO-14361\n\n  1 x Replacement filter unit          USD 477.49\n  1 x Replacement filter unit          USD 537.15\n  6 x Signage, 3 panels                USD 24.99\n\nTotal payable ..... 3.669,80 USD\n",
+    "truth": {
+      "vendor": "Fitzgerald Timber",
+      "date": "2023-03-10",
+      "total": 3669.8,
+      "currency": "USD",
+      "po_number": "PO-14361"
+    },
+    "meta": {
+      "template": 6,
+      "date_style": 5,
+      "amount_style": 3
+    }
+  },
+  {
+    "id": "doc-0071",
+    "document": "*** REMITTANCE ADVICE ***\nSupplier ..... Meridian Office Services\nOur ref ...... PO-46392\nDate issued .. 02-Aug-25\n\n  8 x Signage, 3 panels                USD 272.04\n  4 x Site survey, half day            USD 286.79\n\nBalance to pay:  3,480.75 USD\nPlease quote the reference above when paying.\n",
+    "truth": {
+      "vendor": "Meridian Office Services",
+      "date": "2025-08-02",
+      "total": 3480.75,
+      "currency": "USD",
+      "po_number": "PO-46392"
+    },
+    "meta": {
+      "template": 2,
+      "date_style": 4,
+      "amount_style": 2
+    }
+  },
+  {
+    "id": "doc-0072",
+    "document": "REMlTTANCE\nSupplier: Meridian Office Services\nAccount no. 447153775600092\nDate: 07-Jun-25\nRef: PO-91283\n\n  3 x A4 paper, 5 reams                GBP 824.74\n  3 x Signage, 3 panels                GBP 344.03\n  1 x Safety gloves (box of 50)        GBP 361.50\n\nTotal payable ..... 3,474.15 GBP\n",
+    "truth": {
+      "vendor": "Meridian Office Services",
+      "date": "2025-06-07",
+      "total": 3474.15,
+      "currency": "GBP",
+      "po_number": "PO-91283"
+    },
+    "meta": {
+      "template": 6,
+      "date_style": 4,
+      "amount_style": 2
+    }
+  },
+  {
+    "id": "doc-0073",
+    "document": "*** REMITTANCE ADVICE ***\nSupplier ..... Donnelly Electrical\nOur ref ...... PO-12117\nDate issued .. August 25, 1998\n\n  10 x Safety gloves (box of 50)        USD 161.93\n  1 x Site survey, half day            USD 833.00\n  2 x Safety gloves (box of 50)        USD 359.28\n\nBalance to pay:  USD 5,715.40\nPlease quote the reference above when paying.\n",
+    "truth": {
+      "vendor": "Donnelly Electrical",
+      "date": "1998-08-25",
+      "total": 5715.4,
+      "currency": "USD",
+      "po_number": "PO-12117"
+    },
+    "meta": {
+      "template": 2,
+      "date_style": 3,
+      "amount_style": 1
+    }
+  },
+  {
+    "id": "doc-0074",
+    "document": "*** REMITTANCE ADVICE ***\nSupplier ..... Donnelly Electrical\nOur ref ...... PO-70461\nDate issued .. 14-Apr-24\n\n  2 x Replacement filter unit          EUR 869.74\n  7 x Pallet delivery surcharge        EUR 99.43\n  9 x Pallet delivery surcharge        EUR 262.40\n  7 x A4 paper, 5 reams                EUR 470.63\n\nBalance to pay:  EUR 1,518.93\nPlease quote the reference above when paying.\n",
+    "truth": {
+      "vendor": "Donnelly Electrical",
+      "date": "2024-04-14",
+      "total": 1518.93,
+      "currency": "EUR",
+      "po_number": "PO-70461"
+    },
+    "meta": {
+      "template": 2,
+      "date_style": 4,
+      "amount_style": 1
+    }
+  },
+  {
+    "id": "doc-0075",
+    "document": "REMlTTANCE\nSupplier: Kelleher & Sons Ltd\nAccount no. 447187593100092\nDate: 2023-02-07\nRef: PO-63154\n\n  7 x Site survey, half day            EUR 368.32\n  10 x Replacement filter unit          EUR 435.10\n  5 x Replacement filter unit          EUR 473.80\n\nTotal payable ..... 1.516,78 EUR\n",
+    "truth": {
+      "vendor": "Kelleher & Sons Ltd",
+      "date": "2023-02-07",
+      "total": 1516.78,
+      "currency": "EUR",
+      "po_number": "PO-63154"
+    },
+    "meta": {
+      "template": 6,
+      "date_style": 0,
+      "amount_style": 3
+    }
+  },
+  {
+    "id": "doc-0076",
+    "document": "Aoife Byrne Catering\n94 Bridge Street, Limerick\n\nDated 25-Nov-23\n\n  10 x A4 paper, 5 reams                EUR 49.20\n  10 x Site survey, half day            EUR 184.70\n  5 x Cable ties 200mm                 EUR 838.08\n  10 x Pallet delivery surcharge        EUR 602.44\n\nAMOUNT DUE \u20ac4,256.01\n\nThis is a cash sale. No purchase order was raised.\n",
+    "truth": {
+      "vendor": "Aoife Byrne Catering",
+      "date": "2023-11-25",
+      "total": 4256.01,
+      "currency": "EUR",
+      "po_number": null
+    },
+    "meta": {
+      "template": 5,
+      "date_style": 4,
+      "amount_style": 0
+    }
+  },
+  {
+    "id": "doc-0077",
+    "document": "PURCHASE ORDER CONFIRMATION\n============================\nVENDOR      : Kelleher & Sons Ltd\nPO REF      : PO-96272\nDATE        : 1998-06-23\nLOCATION    : Waterford\n----------------------------\n  12 x A4 paper, 5 reams                EUR 825.32\n----------------------------\nGRAND TOTAL : EUR 6,444.34\n",
+    "truth": {
+      "vendor": "Kelleher & Sons Ltd",
+      "date": "1998-06-23",
+      "total": 6444.34,
+      "currency": "EUR",
+      "po_number": "PO-96272"
+    },
+    "meta": {
+      "template": 7,
+      "date_style": 0,
+      "amount_style": 1
+    }
+  },
+  {
+    "id": "doc-0078",
+    "document": "INVOICE\n\nFrom: Northgate Supplies\n74 Bridge Street\nDublin 2\n\nInvoice date: 16-Jul-25\nPO Number: PO-11826\n\n  8 x Pallet delivery surcharge        GBP 284.30\n  3 x Catering, 12 covers              GBP 337.26\n  3 x Cable ties 200mm                 GBP 542.54\n  1 x Pallet delivery surcharge        GBP 584.43\n\nTOTAL DUE: 9.154,61 GBP\n",
+    "truth": {
+      "vendor": "Northgate Supplies",
+      "date": "2025-07-16",
+      "total": 9154.61,
+      "currency": "GBP",
+      "po_number": "PO-11826"
+    },
+    "meta": {
+      "template": 0,
+      "date_style": 4,
+      "amount_style": 3
+    }
+  },
+  {
+    "id": "doc-0079",
+    "document": "REMlTTANCE\nSupplier: Blue Harbour Logistics\nAccount no. 447145246370092\nDate: 2025-05-05\nRef: PO-10500\n\n  3 x Cable ties 200mm                 EUR 552.16\n  12 x A4 paper, 5 reams                EUR 708.42\n\nTotal payable ..... EUR 1,344.20\n",
+    "truth": {
+      "vendor": "Blue Harbour Logistics",
+      "date": "2025-05-05",
+      "total": 1344.2,
+      "currency": "EUR",
+      "po_number": "PO-10500"
+    },
+    "meta": {
+      "template": 6,
+      "date_style": 0,
+      "amount_style": 1
+    }
+  },
+  {
+    "id": "doc-0080",
+    "document": "INVOICE\n\nFrom: Kelleher & Sons Ltd\n25 Mill Street\nGalway\n\nInvoice date: 08-Nov-19\nPO Number: PO-81515\n\n  1 x Catering, 12 covers              USD 417.03\n  4 x Safety gloves (box of 50)        USD 530.87\n\nTOTAL DUE: $ 228.97\n",
+    "truth": {
+      "vendor": "Kelleher & Sons Ltd",
+      "date": "2019-11-08",
+      "total": 228.97,
+      "currency": "USD",
+      "po_number": "PO-81515"
+    },
+    "meta": {
+      "template": 0,
+      "date_style": 4,
+      "amount_style": 4
+    }
+  },
+  {
+    "id": "doc-0081",
+    "document": "Kelleher & Sons Ltd\nCork | VAT IE6652504\n\nAmount payable 9.354,58 GBP\nRef PO-86500   Dated 04-Sep-19\n\nItems:\n  2 x A4 paper, 5 reams                GBP 277.25\n  5 x Toner cartridge HP-26X           GBP 160.08\n  2 x Catering, 12 covers              GBP 223.06\n",
+    "truth": {
+      "vendor": "Kelleher & Sons Ltd",
+      "date": "2019-09-04",
+      "total": 9354.58,
+      "currency": "GBP",
+      "po_number": "PO-86500"
+    },
+    "meta": {
+      "template": 1,
+      "date_style": 4,
+      "amount_style": 3
+    }
+  },
+  {
+    "id": "doc-0082",
+    "document": "INVOICE\n\nFrom: Kelleher & Sons Ltd\n99 Bridge Street\nGalway\n\nInvoice date: 2023-06-15\nPO Number: PO-22153\n\n  2 x Site survey, half day            EUR 896.39\n  5 x Pallet delivery surcharge        EUR 335.11\n  10 x Pallet delivery surcharge        EUR 571.40\n\nTOTAL DUE: \u20ac 2,766.62\n",
+    "truth": {
+      "vendor": "Kelleher & Sons Ltd",
+      "date": "2023-06-15",
+      "total": 2766.62,
+      "currency": "EUR",
+      "po_number": "PO-22153"
+    },
+    "meta": {
+      "template": 0,
+      "date_style": 0,
+      "amount_style": 4
+    }
+  },
+  {
+    "id": "doc-0083",
+    "document": "PURCHASE ORDER CONFIRMATION\n============================\nVENDOR      : Saoirse Design Studio\nPO REF      : PO-52398\nDATE        : 25 Dec 2023\nLOCATION    : Galway\n----------------------------\n  11 x Site survey, half day            GBP 760.02\n  6 x Pallet delivery surcharge        GBP 528.62\n----------------------------\nGRAND TOTAL : 3,712.72 GBP\n",
+    "truth": {
+      "vendor": "Saoirse Design Studio",
+      "date": "2023-12-25",
+      "total": 3712.72,
+      "currency": "GBP",
+      "po_number": "PO-52398"
+    },
+    "meta": {
+      "template": 7,
+      "date_style": 2,
+      "amount_style": 2
+    }
+  },
+  {
+    "id": "doc-0084",
+    "document": "*** REMITTANCE ADVICE ***\nSupplier ..... Fitzgerald Timber\nOur ref ...... PO-69064\nDate issued .. 26 Sep 2024\n\n  7 x Site survey, half day            GBP 727.37\n  8 x Replacement filter unit          GBP 768.02\n  8 x Replacement filter unit          GBP 283.52\n\nBalance to pay:  3.347,95 GBP\nPlease quote the reference above when paying.\n",
+    "truth": {
+      "vendor": "Fitzgerald Timber",
+      "date": "2024-09-26",
+      "total": 3347.95,
+      "currency": "GBP",
+      "po_number": "PO-69064"
+    },
+    "meta": {
+      "template": 2,
+      "date_style": 2,
+      "amount_style": 3
+    }
+  },
+  {
+    "id": "doc-0085",
+    "document": "REMlTTANCE\nSupplier: Clearwater Sanitation\nAccount no. 447179168450092\nDate: 2024-07-04\nRef: PO-10804\n\n  6 x Catering, 12 covers              GBP 682.06\n  1 x Site survey, half day            GBP 190.64\n  8 x Pallet delivery surcharge        GBP 112.19\n\nTotal payable ..... 1,137.42 GBP\n",
+    "truth": {
+      "vendor": "Clearwater Sanitation",
+      "date": "2024-07-04",
+      "total": 1137.42,
+      "currency": "GBP",
+      "po_number": "PO-10804"
+    },
+    "meta": {
+      "template": 6,
+      "date_style": 0,
+      "amount_style": 2
+    }
+  },
+  {
+    "id": "doc-0086",
+    "document": "REMlTTANCE\nSupplier: Riverside Print Co\nAccount no. 447168171880092\nDate: 19.08.2023\nRef: PO-17775\n\n  2 x Signage, 3 panels                USD 355.91\n  4 x Toner cartridge HP-26X           USD 556.55\n  1 x Site survey, half day            USD 146.09\n\nTotal payable ..... $988.53\n",
+    "truth": {
+      "vendor": "Riverside Print Co",
+      "date": "2023-08-19",
+      "total": 988.53,
+      "currency": "USD",
+      "po_number": "PO-17775"
+    },
+    "meta": {
+      "template": 6,
+      "date_style": 5,
+      "amount_style": 0
+    }
+  },
+  {
+    "id": "doc-0087",
+    "document": "REMlTTANCE\nSupplier: Meridian Office Services\nAccount no. 447195786300092\nDate: June 2, 2019\nRef: PO-77026\n\n  10 x Safety gloves (box of 50)        USD 166.08\n  5 x Signage, 3 panels                USD 451.13\n  9 x Safety gloves (box of 50)        USD 141.00\n\nTotal payable ..... 8.735,57 USD\n",
+    "truth": {
+      "vendor": "Meridian Office Services",
+      "date": "2019-06-02",
+      "total": 8735.57,
+      "currency": "USD",
+      "po_number": "PO-77026"
+    },
+    "meta": {
+      "template": 6,
+      "date_style": 3,
+      "amount_style": 3
+    }
+  },
+  {
+    "id": "doc-0088",
+    "document": "Meridian Office Services\nBelfast | VAT IE8654050\n\nAmount payable 217.99 GBP\nRef PO-75966   Dated 2024-08-23\n\nItems:\n  6 x Toner cartridge HP-26X           GBP 750.15\n  2 x Replacement filter unit          GBP 866.67\n  9 x Toner cartridge HP-26X           GBP 65.92\n  4 x Catering, 12 covers              GBP 418.25\n",
+    "truth": {
+      "vendor": "Meridian Office Services",
+      "date": "2024-08-23",
+      "total": 217.99,
+      "currency": "GBP",
+      "po_number": "PO-75966"
+    },
+    "meta": {
+      "template": 1,
+      "date_style": 0,
+      "amount_style": 2
+    }
+  },
+  {
+    "id": "doc-0089",
+    "document": "Blue Harbour Logistics\n5 Quay Street, Cork\n\nDated 06-Apr-19\n\n  2 x Pallet delivery surcharge        EUR 480.39\n  8 x Replacement filter unit          EUR 101.48\n\nAMOUNT DUE EUR 549.23\n\nThis is a cash sale. No purchase order was raised.\n",
+    "truth": {
+      "vendor": "Blue Harbour Logistics",
+      "date": "2019-04-06",
+      "total": 549.23,
+      "currency": "EUR",
+      "po_number": null
+    },
+    "meta": {
+      "template": 5,
+      "date_style": 4,
+      "amount_style": 1
+    }
+  },
+  {
+    "id": "doc-0090",
+    "document": "TechParts GmbH\n92 Bridge Street, Cork\n\nDated 22.10.2019\n\n  12 x A4 paper, 5 reams                USD 811.80\n\nAMOUNT DUE USD 4,685.46\n\nThis is a cash sale. No purchase order was raised.\n",
+    "truth": {
+      "vendor": "TechParts GmbH",
+      "date": "2019-10-22",
+      "total": 4685.46,
+      "currency": "USD",
+      "po_number": null
+    },
+    "meta": {
+      "template": 5,
+      "date_style": 5,
+      "amount_style": 1
+    }
+  },
+  {
+    "id": "doc-0091",
+    "document": "Kelleher & Sons Ltd\n85 Abbey Street, Cork\n\nDated 07/12/2024\n\n  6 x Replacement filter unit          EUR 138.98\n  6 x Signage, 3 panels                EUR 890.95\n  7 x Replacement filter unit          EUR 592.44\n  2 x Signage, 3 panels                EUR 513.76\n\nAMOUNT DUE 9.094,46 EUR\n\nThis is a cash sale. No purchase order was raised.\n",
+    "truth": {
+      "vendor": "Kelleher & Sons Ltd",
+      "date": "2024-12-07",
+      "total": 9094.46,
+      "currency": "EUR",
+      "po_number": null
+    },
+    "meta": {
+      "template": 5,
+      "date_style": 1,
+      "amount_style": 3
+    }
+  },
+  {
+    "id": "doc-0092",
+    "document": "REMlTTANCE\nSupplier: Fitzgerald Timber\nAccount no. 447180607330092\nDate: May 20, 2024\nRef: PO-13569\n\n  3 x Replacement filter unit          EUR 219.74\n  2 x A4 paper, 5 reams                EUR 161.46\n\nTotal payable ..... 4,756.50 EUR\n",
+    "truth": {
+      "vendor": "Fitzgerald Timber",
+      "date": "2024-05-20",
+      "total": 4756.5,
+      "currency": "EUR",
+      "po_number": "PO-13569"
+    },
+    "meta": {
+      "template": 6,
+      "date_style": 3,
+      "amount_style": 2
+    }
+  },
+  {
+    "id": "doc-0093",
+    "document": "Meridian Office Services\nDublin 2\n\nInvoice date : July 6, 2024\nPayment due  : August 6, 2024\nOrder ref    : PO-63821\n\n  9 x Catering, 12 covers              USD 420.10\n\nSubtotal     : $4,592.88\nVAT @ 23%    : $1,056.37\nTotal        : $5,649.25\n",
+    "truth": {
+      "vendor": "Meridian Office Services",
+      "date": "2024-07-06",
+      "total": 5649.25,
+      "currency": "USD",
+      "po_number": "PO-63821"
+    },
+    "meta": {
+      "template": 4,
+      "date_style": 3,
+      "amount_style": 0
+    }
+  },
+  {
+    "id": "doc-0094",
+    "document": "Aoife Byrne Catering\n37 Mill Street, Belfast\n\nDated 2023-06-13\n\n  6 x A4 paper, 5 reams                USD 781.53\n  6 x Toner cartridge HP-26X           USD 282.56\n  10 x Catering, 12 covers              USD 429.97\n  3 x Safety gloves (box of 50)        USD 475.95\n\nAMOUNT DUE USD 2,165.91\n\nThis is a cash sale. No purchase order was raised.\n",
+    "truth": {
+      "vendor": "Aoife Byrne Catering",
+      "date": "2023-06-13",
+      "total": 2165.91,
+      "currency": "USD",
+      "po_number": null
+    },
+    "meta": {
+      "template": 5,
+      "date_style": 0,
+      "amount_style": 1
+    }
+  },
+  {
+    "id": "doc-0095",
+    "document": "PURCHASE ORDER CONFIRMATION\n============================\nVENDOR      : Fitzgerald Timber\nPO REF      : PO-77489\nDATE        : 21.01.1998\nLOCATION    : Waterford\n----------------------------\n  4 x Catering, 12 covers              EUR 427.87\n----------------------------\nGRAND TOTAL : 2.761,05 EUR\n",
+    "truth": {
+      "vendor": "Fitzgerald Timber",
+      "date": "1998-01-21",
+      "total": 2761.05,
+      "currency": "EUR",
+      "po_number": "PO-77489"
+    },
+    "meta": {
+      "template": 7,
+      "date_style": 5,
+      "amount_style": 3
+    }
+  },
+  {
+    "id": "doc-0096",
+    "document": "PURCHASE ORDER CONFIRMATION\n============================\nVENDOR      : TechParts GmbH\nPO REF      : PO-31372\nDATE        : 27.12.2025\nLOCATION    : Galway\n----------------------------\n  9 x Cable ties 200mm                 GBP 523.21\n  9 x Toner cartridge HP-26X           GBP 76.81\n  2 x Replacement filter unit          GBP 803.91\n  10 x Replacement filter unit          GBP 67.24\n----------------------------\nGRAND TOTAL : GBP 8,258.30\n",
+    "truth": {
+      "vendor": "TechParts GmbH",
+      "date": "2025-12-27",
+      "total": 8258.3,
+      "currency": "GBP",
+      "po_number": "PO-31372"
+    },
+    "meta": {
+      "template": 7,
+      "date_style": 5,
+      "amount_style": 1
+    }
+  },
+  {
+    "id": "doc-0097",
+    "document": "Blue Harbour Logistics\nUnit 4, 22 Abbey Street\nDublin 2\nIreland\n\nDear Customer,\n\nPlease find enclosed our invoice dated 25/09/2019 under purchase order PO-64201.\n\n  2 x Toner cartridge HP-26X           EUR 692.26\n  3 x Replacement filter unit          EUR 184.82\n  1 x Pallet delivery surcharge        EUR 58.08\n\nThe amount of EUR 2,896.48 is due within 30 days of the date above.\n\nRegards,\nAccounts Receivable\n",
+    "truth": {
+      "vendor": "Blue Harbour Logistics",
+      "date": "2019-09-25",
+      "total": 2896.48,
+      "currency": "EUR",
+      "po_number": "PO-64201"
+    },
+    "meta": {
+      "template": 3,
+      "date_style": 1,
+      "amount_style": 1
+    }
+  },
+  {
+    "id": "doc-0098",
+    "document": "Donnelly Electrical\nCork\n\nInvoice date : 08-Jun-19\nPayment due  : 08-Jul-19\nOrder ref    : PO-94694\n\n  10 x Replacement filter unit          GBP 134.18\n  5 x A4 paper, 5 reams                GBP 157.19\n\nSubtotal     : 46,54 GBP\nVAT @ 23%    : 10,71 GBP\nTotal        : 57,25 GBP\n",
+    "truth": {
+      "vendor": "Donnelly Electrical",
+      "date": "2019-06-08",
+      "total": 57.25,
+      "currency": "GBP",
+      "po_number": "PO-94694"
+    },
+    "meta": {
+      "template": 4,
+      "date_style": 4,
+      "amount_style": 3
+    }
+  },
+  {
+    "id": "doc-0099",
+    "document": "Clearwater Sanitation\nLimerick | VAT IE3702697\n\nAmount payable EUR 7,449.16\nRef PO-31776   Dated 02/04/2025\n\nItems:\n  8 x Pallet delivery surcharge        EUR 154.29\n  7 x Signage, 3 panels                EUR 518.12\n  8 x Signage, 3 panels                EUR 838.13\n  1 x Safety gloves (box of 50)        EUR 505.40\n",
+    "truth": {
+      "vendor": "Clearwater Sanitation",
+      "date": "2025-04-02",
+      "total": 7449.16,
+      "currency": "EUR",
+      "po_number": "PO-31776"
+    },
+    "meta": {
+      "template": 1,
+      "date_style": 1,
+      "amount_style": 1
+    }
+  },
+  {
+    "id": "doc-0100",
+    "document": "INVOICE\n\nFrom: Fitzgerald Timber\n27 Abbey Street\nCork\n\nInvoice date: 16/12/2024\nPO Number: PO-33888\n\n  2 x Site survey, half day            GBP 681.99\n\nTOTAL DUE: 3.359,81 GBP\n",
+    "truth": {
+      "vendor": "Fitzgerald Timber",
+      "date": "2024-12-16",
+      "total": 3359.81,
+      "currency": "GBP",
+      "po_number": "PO-33888"
+    },
+    "meta": {
+      "template": 0,
+      "date_style": 1,
+      "amount_style": 3
+    }
+  },
+  {
+    "id": "doc-0101",
+    "document": "Kelleher & Sons Ltd\nUnit 4, 87 Abbey Street\nWaterford\nIreland\n\nDear Customer,\n\nPlease find enclosed our invoice dated 2019-12-21 under purchase order PO-48622.\n\n  12 x A4 paper, 5 reams                GBP 280.82\n  2 x Replacement filter unit          GBP 100.36\n\nThe amount of GBP 9,381.47 is due within 30 days of the date above.\n\nRegards,\nAccounts Receivable\n",
+    "truth": {
+      "vendor": "Kelleher & Sons Ltd",
+      "date": "2019-12-21",
+      "total": 9381.47,
+      "currency": "GBP",
+      "po_number": "PO-48622"
+    },
+    "meta": {
+      "template": 3,
+      "date_style": 0,
+      "amount_style": 1
+    }
+  },
+  {
+    "id": "doc-0102",
+    "document": "*** REMITTANCE ADVICE ***\nSupplier ..... Kelleher & Sons Ltd\nOur ref ...... PO-48337\nDate issued .. November 21, 1998\n\n  7 x Cable ties 200mm                 USD 860.21\n  6 x A4 paper, 5 reams                USD 541.76\n  11 x Signage, 3 panels                USD 846.71\n\nBalance to pay:  7,191.88 USD\nPlease quote the reference above when paying.\n",
+    "truth": {
+      "vendor": "Kelleher & Sons Ltd",
+      "date": "1998-11-21",
+      "total": 7191.88,
+      "currency": "USD",
+      "po_number": "PO-48337"
+    },
+    "meta": {
+      "template": 2,
+      "date_style": 3,
+      "amount_style": 2
+    }
+  },
+  {
+    "id": "doc-0103",
+    "document": "Riverside Print Co\nGalway | VAT IE5161448\n\nAmount payable 5,596.43 GBP\nRef PO-66832   Dated 19.05.2024\n\nItems:\n  1 x Replacement filter unit          GBP 175.14\n  2 x Site survey, half day            GBP 258.21\n",
+    "truth": {
+      "vendor": "Riverside Print Co",
+      "date": "2024-05-19",
+      "total": 5596.43,
+      "currency": "GBP",
+      "po_number": "PO-66832"
+    },
+    "meta": {
+      "template": 1,
+      "date_style": 5,
+      "amount_style": 2
+    }
+  },
+  {
+    "id": "doc-0104",
+    "document": "Meridian Office Services\nUnit 4, 84 Bridge Street\nGalway\nIreland\n\nDear Customer,\n\nPlease find enclosed our invoice dated 9 Nov 2019 under purchase order PO-25632.\n\n  11 x A4 paper, 5 reams                GBP 472.50\n  11 x Toner cartridge HP-26X           GBP 347.86\n\nThe amount of 318,90 GBP is due within 30 days of the date above.\n\nRegards,\nAccounts Receivable\n",
+    "truth": {
+      "vendor": "Meridian Office Services",
+      "date": "2019-11-09",
+      "total": 318.9,
+      "currency": "GBP",
+      "po_number": "PO-25632"
+    },
+    "meta": {
+      "template": 3,
+      "date_style": 2,
+      "amount_style": 3
+    }
+  },
+  {
+    "id": "doc-0105",
+    "document": "*** REMITTANCE ADVICE ***\nSupplier ..... Meridian Office Services\nOur ref ...... PO-47513\nDate issued .. 11 Mar 2025\n\n  5 x Signage, 3 panels                USD 671.28\n  1 x Replacement filter unit          USD 627.81\n  8 x Signage, 3 panels                USD 168.86\n\nBalance to pay:  1,551.76 USD\nPlease quote the reference above when paying.\n",
+    "truth": {
+      "vendor": "Meridian Office Services",
+      "date": "2025-03-11",
+      "total": 1551.76,
+      "currency": "USD",
+      "po_number": "PO-47513"
+    },
+    "meta": {
+      "template": 2,
+      "date_style": 2,
+      "amount_style": 2
+    }
+  },
+  {
+    "id": "doc-0106",
+    "document": "PURCHASE ORDER CONFIRMATION\n============================\nVENDOR      : O'Sullivan Hardware\nPO REF      : PO-84787\nDATE        : 08/09/2025\nLOCATION    : Limerick\n----------------------------\n  2 x Replacement filter unit          USD 125.61\n----------------------------\nGRAND TOTAL : $ 9,173.16\n",
+    "truth": {
+      "vendor": "O'Sullivan Hardware",
+      "date": "2025-09-08",
+      "total": 9173.16,
+      "currency": "USD",
+      "po_number": "PO-84787"
+    },
+    "meta": {
+      "template": 7,
+      "date_style": 1,
+      "amount_style": 4
+    }
+  },
+  {
+    "id": "doc-0107",
+    "document": "Saoirse Design Studio\nUnit 4, 86 Mill Street\nLimerick\nIreland\n\nDear Customer,\n\nPlease find enclosed our invoice dated 20 Jun 2024 under purchase order PO-29654.\n\n  2 x Site survey, half day            EUR 518.63\n\nThe amount of 9,271.21 EUR is due within 30 days of the date above.\n\nRegards,\nAccounts Receivable\n",
+    "truth": {
+      "vendor": "Saoirse Design Studio",
+      "date": "2024-06-20",
+      "total": 9271.21,
+      "currency": "EUR",
+      "po_number": "PO-29654"
+    },
+    "meta": {
+      "template": 3,
+      "date_style": 2,
+      "amount_style": 2
+    }
+  },
+  {
+    "id": "doc-0108",
+    "document": "INVOICE\n\nFrom: Fitzgerald Timber\n74 Quay Street\nLimerick\n\nInvoice date: 10-Apr-19\nPO Number: PO-91654\n\n  9 x Safety gloves (box of 50)        USD 800.64\n  5 x Toner cartridge HP-26X           USD 165.10\n  5 x Replacement filter unit          USD 476.66\n\nTOTAL DUE: $ 4,249.77\n",
+    "truth": {
+      "vendor": "Fitzgerald Timber",
+      "date": "2019-04-10",
+      "total": 4249.77,
+      "currency": "USD",
+      "po_number": "PO-91654"
+    },
+    "meta": {
+      "template": 0,
+      "date_style": 4,
+      "amount_style": 4
+    }
+  },
+  {
+    "id": "doc-0109",
+    "document": "*** REMITTANCE ADVICE ***\nSupplier ..... Riverside Print Co\nOur ref ...... PO-15428\nDate issued .. 16 Aug 2024\n\n  2 x Pallet delivery surcharge        EUR 292.80\n  10 x Cable ties 200mm                 EUR 802.81\n\nBalance to pay:  \u20ac 4,356.66\nPlease quote the reference above when paying.\n",
+    "truth": {
+      "vendor": "Riverside Print Co",
+      "date": "2024-08-16",
+      "total": 4356.66,
+      "currency": "EUR",
+      "po_number": "PO-15428"
+    },
+    "meta": {
+      "template": 2,
+      "date_style": 2,
+      "amount_style": 4
+    }
+  },
+  {
+    "id": "doc-0110",
+    "document": "REMlTTANCE\nSupplier: Blue Harbour Logistics\nAccount no. 447134497120092\nDate: August 25, 2023\nRef: PO-61052\n\n  5 x A4 paper, 5 reams                GBP 81.70\n\nTotal payable ..... GBP 8,171.37\n",
+    "truth": {
+      "vendor": "Blue Harbour Logistics",
+      "date": "2023-08-25",
+      "total": 8171.37,
+      "currency": "GBP",
+      "po_number": "PO-61052"
+    },
+    "meta": {
+      "template": 6,
+      "date_style": 3,
+      "amount_style": 1
+    }
+  },
+  {
+    "id": "doc-0111",
+    "document": "Meridian Office Services\nWaterford | VAT IE4031955\n\nAmount payable 6,077.78 GBP\nRef PO-48422   Dated 14/03/2025\n\nItems:\n  10 x Toner cartridge HP-26X           GBP 703.08\n  1 x Signage, 3 panels                GBP 83.64\n  7 x Catering, 12 covers              GBP 829.19\n",
+    "truth": {
+      "vendor": "Meridian Office Services",
+      "date": "2025-03-14",
+      "total": 6077.78,
+      "currency": "GBP",
+      "po_number": "PO-48422"
+    },
+    "meta": {
+      "template": 1,
+      "date_style": 1,
+      "amount_style": 2
+    }
+  },
+  {
+    "id": "doc-0112",
+    "document": "Kelleher & Sons Ltd\n15 Bridge Street, Cork\n\nDated 16/07/2024\n\n  9 x Cable ties 200mm                 USD 271.06\n  9 x Catering, 12 covers              USD 797.53\n\nAMOUNT DUE 3.433,76 USD\n\nThis is a cash sale. No purchase order was raised.\n",
+    "truth": {
+      "vendor": "Kelleher & Sons Ltd",
+      "date": "2024-07-16",
+      "total": 3433.76,
+      "currency": "USD",
+      "po_number": null
+    },
+    "meta": {
+      "template": 5,
+      "date_style": 1,
+      "amount_style": 3
+    }
+  },
+  {
+    "id": "doc-0113",
+    "document": "Clearwater Sanitation\nUnit 4, 66 Abbey Street\nWaterford\nIreland\n\nDear Customer,\n\nPlease find enclosed our invoice dated 19.06.2019 under purchase order PO-33424.\n\n  10 x Catering, 12 covers              GBP 447.73\n\nThe amount of \u00a3 1,425.11 is due within 30 days of the date above.\n\nRegards,\nAccounts Receivable\n",
+    "truth": {
+      "vendor": "Clearwater Sanitation",
+      "date": "2019-06-19",
+      "total": 1425.11,
+      "currency": "GBP",
+      "po_number": "PO-33424"
+    },
+    "meta": {
+      "template": 3,
+      "date_style": 5,
+      "amount_style": 4
+    }
+  },
+  {
+    "id": "doc-0114",
+    "document": "Donnelly Electrical\nGalway\n\nInvoice date : 12.02.2019\nPayment due  : 12.03.2019\nOrder ref    : PO-67105\n\n  5 x A4 paper, 5 reams                GBP 628.66\n  2 x Site survey, half day            GBP 431.91\n  6 x Site survey, half day            GBP 523.14\n\nSubtotal     : GBP 5,911.00\nVAT @ 23%    : GBP 1,359.54\nTotal        : GBP 7,270.54\n",
+    "truth": {
+      "vendor": "Donnelly Electrical",
+      "date": "2019-02-12",
+      "total": 7270.54,
+      "currency": "GBP",
+      "po_number": "PO-67105"
+    },
+    "meta": {
+      "template": 4,
+      "date_style": 5,
+      "amount_style": 1
+    }
+  },
+  {
+    "id": "doc-0115",
+    "document": "REMlTTANCE\nSupplier: Fitzgerald Timber\nAccount no. 447145856010092\nDate: 19/06/2024\nRef: PO-76051\n\n  2 x Catering, 12 covers              USD 659.75\n\nTotal payable ..... $8,296.21\n",
+    "truth": {
+      "vendor": "Fitzgerald Timber",
+      "date": "2024-06-19",
+      "total": 8296.21,
+      "currency": "USD",
+      "po_number": "PO-76051"
+    },
+    "meta": {
+      "template": 6,
+      "date_style": 1,
+      "amount_style": 0
+    }
+  },
+  {
+    "id": "doc-0116",
+    "document": "PURCHASE ORDER CONFIRMATION\n============================\nVENDOR      : Fitzgerald Timber\nPO REF      : PO-88709\nDATE        : 02-Aug-19\nLOCATION    : Waterford\n----------------------------\n  2 x Site survey, half day            USD 321.26\n  9 x Safety gloves (box of 50)        USD 201.88\n  5 x Safety gloves (box of 50)        USD 682.55\n  10 x A4 paper, 5 reams                USD 224.78\n----------------------------\nGRAND TOTAL : USD 4,424.53\n",
+    "truth": {
+      "vendor": "Fitzgerald Timber",
+      "date": "2019-08-02",
+      "total": 4424.53,
+      "currency": "USD",
+      "po_number": "PO-88709"
+    },
+    "meta": {
+      "template": 7,
+      "date_style": 4,
+      "amount_style": 1
+    }
+  },
+  {
+    "id": "doc-0117",
+    "document": "INVOICE\n\nFrom: Saoirse Design Studio\n31 Bridge Street\nLimerick\n\nInvoice date: 18/08/1998\nPO Number: PO-64458\n\n  12 x Signage, 3 panels                EUR 373.50\n  6 x Replacement filter unit          EUR 156.75\n\nTOTAL DUE: \u20ac5,056.80\n",
+    "truth": {
+      "vendor": "Saoirse Design Studio",
+      "date": "1998-08-18",
+      "total": 5056.8,
+      "currency": "EUR",
+      "po_number": "PO-64458"
+    },
+    "meta": {
+      "template": 0,
+      "date_style": 1,
+      "amount_style": 0
+    }
+  },
+  {
+    "id": "doc-0118",
+    "document": "REMlTTANCE\nSupplier: Northgate Supplies\nAccount no. 447125014640092\nDate: 2025-11-01\nRef: PO-13526\n\n  9 x A4 paper, 5 reams                GBP 664.15\n\nTotal payable ..... 8,904.67 GBP\n",
+    "truth": {
+      "vendor": "Northgate Supplies",
+      "date": "2025-11-01",
+      "total": 8904.67,
+      "currency": "GBP",
+      "po_number": "PO-13526"
+    },
+    "meta": {
+      "template": 6,
+      "date_style": 0,
+      "amount_style": 2
+    }
+  },
+  {
+    "id": "doc-0119",
+    "document": "Riverside Print Co\n47 Mill Street, Cork\n\nDated 2025-09-03\n\n  10 x A4 paper, 5 reams                GBP 348.62\n\nAMOUNT DUE 2,347.84 GBP\n\nThis is a cash sale. No purchase order was raised.\n",
+    "truth": {
+      "vendor": "Riverside Print Co",
+      "date": "2025-09-03",
+      "total": 2347.84,
+      "currency": "GBP",
+      "po_number": null
+    },
+    "meta": {
+      "template": 5,
+      "date_style": 0,
+      "amount_style": 2
+    }
+  }
+]

@@ -1,0 +1,25 @@
+[project]
+name = "journeyman"
+version = "1.0.0"
+description = "An AI engineer that builds it, proves it on data it has not seen, and remembers what worked."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Naseeruddeen Shahul Hameed" }]
+dependencies = ["strands-agents>=1.55.0", "strands-agents-tools>=0.8.0"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+journeyman = "journeyman.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["journeyman*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
