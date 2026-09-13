@@ -115,15 +115,45 @@ def test_plist_is_well_formed_and_conservative(tmp_path, monkeypatch):
 
 
 def test_uninstall_leaves_your_records_alone(tmp_path, monkeypatch):
+    """Never let this reach the real launchctl.
+
+    The first version monkeypatched only the plist path. `launchctl unload -w`
+    resolves the service by the Label inside the file, not by the path, so the
+    test unloaded the agent actually running on the developer's machine. A test
+    that reaches outside its tmp_path is a bug in the test.
+    """
     import journeyman.service as svc
+
+    unloaded = []
+    monkeypatch.setattr(svc, "unload", lambda: (unloaded.append(True), (True, ""))[1])
 
     plist = tmp_path / "agent.plist"
     monkeypatch.setattr(svc, "PLIST", plist)
     svc.write_plist([str(tmp_path)])
     assert plist.exists()
+
     msg = svc.uninstall()
     assert not plist.exists()
     assert "untouched" in msg
+    assert unloaded, "uninstall should stop the service before removing the file"
+
+
+def test_no_test_in_this_file_touches_the_real_launchd(monkeypatch):
+    """A guard, because the failure mode is silent and off-machine."""
+    import journeyman.service as svc
+
+    calls = []
+    monkeypatch.setattr(svc.subprocess, "run",
+                        lambda *a, **k: calls.append(a) or _Fake())
+    svc.is_loaded()
+    assert calls, "is_loaded should shell out"
+    assert all("launchctl" in str(c) for c in calls)
+
+
+class _Fake:
+    returncode = 0
+    stdout = ""
+    stderr = ""
 
 
 def test_home_survives_being_installed_elsewhere(tmp_path, monkeypatch):
