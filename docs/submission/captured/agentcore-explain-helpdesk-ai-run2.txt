@@ -1,0 +1,108 @@
+
+  helpdesk-ai: 6 finding(s), reviewed on AgentCore
+
+  [85] AIE008  prompts/triage_prompt.txt is a prompt with no eval
+        prompts/triage_prompt.txt
+  [70] AIE003  model output parsed with json.loads and no schema
+        app/triage.py:21
+  [70] AIE005  client.chat.completions.create() has no timeout or retry anywhere in this file
+        app/triage.py:14
+  [70] AIE005  client.chat.completions.create() has no timeout or retry anywhere in this file
+        app/replies.py:14
+  [60] AIE001  model id 'gpt-4o-mini' is hardcoded
+        app/triage.py:15
+  [60] AIE002  client.chat.completions.create() has no max_tokens
+        app/triage.py:14
+
+  Here are the three issues worth stopping a merge for:
+  
+  ---
+  
+  ### 1. `json.loads` with no fence-stripping will crash in production — `app/triage.py:21`
+  
+  The prompt says "Reply with JSON only" but models routinely wrap their output in a markdown fence anyway:
+  
+  ```
+  ```json
+  {"queue": "billing", ...}
+  ```
+  ```
+  
+  `json.loads` on that string raises `JSONDecodeError` and the whole ticket is dropped. There is also zero schema validation, so a hallucinated key name silently produces a dict that downstream code will `KeyError` on.
+  
+  **Minimal fix:**
+  
+  ```python
+  # app/triage.py
+  from pydantic import BaseModel
+  
+  class TriageResult(BaseModel):
+      queue: str
+      urgency: str
+      summary: str
+  
+  def triage(ticket_text: str) -> TriageResult:
+      response = client.chat.completions.create(
+          model=MODEL,
+          messages=[...],
+          response_format={"type": "json_object"},  # enforces JSON at the API level
+          max_tokens=256,
+          timeout=10,
+      )
+      raw = response.choices[0].message.content
+      return TriageResult.model_validate_json(raw)
+  ```
+  
+  Using `response_format={"type": "json_object"}` eliminates the fence problem at the source. Pydantic catches missing or mistyped fields immediately.
+  
+  ---
+  
+  ### 2. No timeout or retry on either call site — `app/triage.py:14` and `app/replies.py:14`
+  
+  Both calls hang indefinitely if OpenAI is slow or drops the connection. A single stuck thread will eventually exhaust your worker pool. `replies.py` has `max_tokens` but still no timeout.
+  
+  **Minimal fix (shared utility, use in both files):**
+  
+  ```python
+  # app/_openai_client.py
+  from openai import OpenAI
+  from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
+  
+  def _is_transient(exc):
+      from openai import RateLimitError, APIStatusError, APIConnectionError
+      if isinstance(exc, RateLimitError): return True
+      if isinstance(exc, APIConnectionError): return True
+      if isinstance(exc, APIStatusError): return exc.status_code >= 500
+      return False
+  
+  client = OpenAI(timeout=15.0)
+  
+  @retry(retry=retry_if_exception(_is_transient),
+         wait=wait_exponential(multiplier=1, min=1, max=30),
+         stop=stop_after_attempt(4))
+  def chat_create(**kwargs):
+      return client.chat.completions.create(**kwargs)
+  ```
+  
+  Then both `triage.py` and `replies.py` call `chat_create(...)` instead of `client.chat.completions.create(...)`. Do **not** retry on 400s — those are prompt/code bugs and retrying just burns quota while hiding them.
+  
+  ---
+  
+  ### 3. Model ID hardcoded in `triage.py`, inconsistently — `app/triage.py:15`
+  
+  `replies.py` already has `MODEL = "gpt-4o-mini"` as a module constant (good). `triage.py` has the string inline at the call site. When you need to swap models — for cost, capability, or an API deprecation — you will miss the inline one.
+  
+  **Fix:**
+  
+  ```python
+  # app/triage.py  (add near top, remove the inline string at line 15)
+  import os
+  MODEL = os.environ.get("APP_MODEL", "gpt-4o-mini")
+  ```
+  
+  Ideally both files import from a single `app/config.py` so there is exactly one place to change and one place to grep.
+  
+  ---
+  
+  **Summary of priority:** Fix #1 first — it is a guaranteed crash path on normal model output. Fix #2 next — a missing timeout is a latency bomb under any real load. Fix #3 is low-risk but cheap to do while you're already in the file.
+
