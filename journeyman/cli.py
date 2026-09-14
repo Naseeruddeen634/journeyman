@@ -317,6 +317,57 @@ def _propose(args) -> int:
     return 0
 
 
+def _eval(args) -> int:
+    """Build or run the eval harness for a prompt file."""
+    from .evals import SYNTH_PROMPT, EvalDir, parse_synthesized, record_baseline, scaffold
+
+    repo = Path(args.repo).resolve()
+    prompt_path = Path(args.prompt).resolve()
+    if not prompt_path.exists():
+        print(f"\n  No prompt file at {prompt_path}\n", file=sys.stderr)
+        return 2
+
+    def model_call():
+        from strands import Agent
+        from .brain.models import pick
+        model, name, why = pick("routine")
+        print(f"  model: {name} ({why})")
+        return (lambda text: str(Agent(model=model, callback_handler=None)(text)).strip()), name
+
+    ev = EvalDir(repo, prompt_path)
+    if not ev.cases_file.exists() or args.overwrite:
+        cases = None
+        if args.synthesize:
+            call, _ = model_call()
+            cases = parse_synthesized(call(SYNTH_PROMPT.format(n=args.synthesize, prompt=ev.prompt())))
+            print(f"  synthesized {len(cases)} usable case(s)" if cases
+                  else "  synthesis produced nothing usable; writing starter cases instead")
+        ev = scaffold(repo, prompt_path, cases or None, overwrite=args.overwrite)
+        print(f"\n  cases     {ev.cases_file}")
+        print(f"  test      {ev.test_file}")
+        if not cases:
+            print("\n  The starter cases contain REPLACE placeholders. Edit them, then --record.")
+
+    if args.record:
+        call, name = model_call()
+        result = ev.run(call=call, model=name)
+        record_baseline(ev, result)
+        print(f"\n  recorded {sum(result.counts.values())} response(s), baseline written")
+    else:
+        result = ev.run()
+        if result.unrecorded:
+            print(f"\n  {len(result.unrecorded)} case(s) have no recorded response. Run with --record.\n")
+            return 1
+
+    for split in ("holdout", "train"):
+        if split in result.scores:
+            print(f"  {split:<8} {result.scores[split]:.0%}  ({result.counts[split]} cases)")
+    for f in result.failures[:5]:
+        print(f"    miss [{f['split']}] {f['id']}: expected {f['expect']}, got {f['got'][:60]!r}")
+    print()
+    return 0
+
+
 def _brain(args) -> int:
     from .brain.models import check
     st = check()
@@ -399,6 +450,15 @@ def main(argv: list[str] | None = None) -> int:
     rs.add_argument("--repo", action="append")
     rs.add_argument("--max-shifts", type=int, default=2)
     rs.set_defaults(func=_run_scheduled)
+
+    ev = sub.add_parser("eval", help="build or run an eval harness for a prompt file")
+    ev.add_argument("prompt")
+    ev.add_argument("--repo", default=".")
+    ev.add_argument("--synthesize", type=int, default=0, metavar="N",
+                    help="ask the model for N cases instead of starter placeholders")
+    ev.add_argument("--record", action="store_true", help="call the model and record responses")
+    ev.add_argument("--overwrite", action="store_true")
+    ev.set_defaults(func=_eval)
 
     po = sub.add_parser("propose", help="write the PR description for a delivered shift")
     po.add_argument("--repo", default=".")
