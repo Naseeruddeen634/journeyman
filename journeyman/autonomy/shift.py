@@ -115,6 +115,25 @@ def claims_vs_diff(summary: str, diff: str) -> list[str]:
     return notes
 
 
+CONTRACT_WORDS = re.compile(r"(docstring|documented|documentation|the spec\b|specification|"
+                            r"contract)", re.I)
+CONFLICT_WORDS = re.compile(r"(mismatch|contradict|conflict|inconsisten|doesn't match|does not "
+                            r"match|violat|differs? from|not what the)", re.I)
+
+
+def admits_contract_conflict(summary: str) -> str:
+    """The sentence where the agent says its change contradicts the documentation.
+
+    Twice a shift deleted documented behaviour to satisfy a test and said so in
+    its own summary. A flagged fix is still a delivered fix, so an admission is
+    now a reason to withhold, not a footnote.
+    """
+    for raw in re.split(r"(?<=[.!?])\s+|\n", summary or ""):
+        if CONTRACT_WORDS.search(raw) and CONFLICT_WORDS.search(raw):
+            return raw.strip()[:220]
+    return ""
+
+
 def find_concerns(summary: str) -> list[str]:
     """Sentences where the agent hedged about its own change."""
     out = []
@@ -296,7 +315,8 @@ STUCK: and what you think is going on."""
 
 
 def progress_check(root: Path, task: Task, fail_before: set[str],
-                   findings_before: dict[str, int], changed: list[str]) -> tuple[bool, str]:
+                   findings_before: dict[str, int], changed: list[str],
+                   summary: str = "") -> tuple[bool, str]:
     """The same test the shift applies at the end, run while there is still time to act.
 
     An agent that says DONE has made a claim. In real runs it said DONE with the
@@ -328,6 +348,17 @@ def progress_check(root: Path, task: Task, fail_before: set[str],
                     lines.append(f"    {f.evidence}")
             lines.append(f"\nWhat resolves it: {still[0].fix}")
             problems.append("\n".join(lines))
+
+    from .contract import check_worktree
+
+    for v in check_worktree(root, changed):
+        problems.append("Your change breaks a documented promise. " + v.describe() + " Make the "
+                        "code satisfy both the test and the docstring. If they genuinely "
+                        "conflict, reply STUCK and explain the conflict instead of choosing one.")
+    admitted = admits_contract_conflict(summary)
+    if admitted:
+        problems.append(f"You said: \"{admitted}\" A change that contradicts the documented "
+                        "behaviour will not be accepted. Satisfy both, or reply STUCK and explain.")
     return (not problems, "\n\n".join(problems))
 
 
@@ -572,7 +603,7 @@ def work_one(repo: str | Path, task: Task | None = None, budget: Budget | None =
             if guard.stopped_by or round_no == max_feedback_rounds:
                 break
             ok, feedback = progress_check(sandbox.root, task, before, findings_before,
-                                          sandbox.changed_files())
+                                          sandbox.changed_files(), result.summary)
             if ok:
                 break
             result.feedback_rounds += 1
@@ -616,6 +647,11 @@ def work_one(repo: str | Path, task: Task | None = None, budget: Budget | None =
                 "The change introduced new review findings in the same file: "
                 + ", ".join(result.findings_introduced))
 
+    from .contract import check_worktree
+
+    violations = check_worktree(sandbox.root, result.files_changed)
+    admitted = admits_contract_conflict(result.summary)
+
     if result.outcome not in ("refused", "error"):
         if result.new_failures:
             # Broke something that was working. Nothing else matters.
@@ -630,6 +666,14 @@ def work_one(repo: str | Path, task: Task | None = None, budget: Budget | None =
         elif task.kind == "failing_test" and not result.fixed_failures:
             # It was sent to fix a red test and the test is still red.
             result.outcome = "stuck"
+        elif violations or admitted:
+            # The tests went green by deleting what the code promises. Twice a
+            # shift did exactly this; once it was delivered. Not any more.
+            result.outcome = "stuck"
+            reason = violations[0].describe() if violations else f'The agent said: "{admitted}"'
+            result.concerns.append(reason)
+            result.summary = ("Made the tests pass, but the change contradicts the documented "
+                              f"behaviour. Not committed. {reason}\n" + (result.summary or ""))
         elif task.kind == "ai_review" and result.finding_resolved is False:
             # Changed something, but the thing it was sent for is still there.
             result.outcome = "stuck"

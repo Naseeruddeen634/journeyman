@@ -75,7 +75,10 @@ def local_brain(temperature: float = 0.2, **kw):
         temperature=temperature,
         max_tokens=MAX_OUTPUT_TOKENS,
         options={"num_ctx": LOCAL_CTX, **kw.pop("options", {})},
-        keep_alive="30m",   # a shift is many calls; do not reload 18 GB between them
+        # A shift is many calls, and a feedback check runs the test suite between
+        # them, so keep the model loaded across those gaps. Not thirty minutes: on a
+        # 24 GB laptop that is 18 GB held long after the shift has finished.
+        keep_alive="10m",
         **kw,
     )
 

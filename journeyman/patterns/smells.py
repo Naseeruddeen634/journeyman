@@ -222,7 +222,10 @@ def check_unvalidated_parsing(path: Path, text: str, tree: ast.AST, rel: str) ->
                  "parse rather than at the prompt that caused it."),
             fix=("Use the provider's structured-output or tool-calling mode so the "
                  "shape is enforced, and validate with a Pydantic model. If you must "
-                 "parse by hand, catch JSONDecodeError and keep the raw text in the error."),
+                 "parse by hand, strip a surrounding ``` or ```json fence first (the most "
+                 "common thing models add), then json.loads, and on JSONDecodeError raise an "
+                 "error that keeps the raw text. Catching the error without handling fences "
+                 "still fails on ordinary model output."),
             where=f"{rel}:{node.lineno}", severity=70, evidence=src[:160],
         ))
     return out
