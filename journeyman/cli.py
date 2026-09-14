@@ -432,6 +432,14 @@ def _eval(args) -> int:
     return 0
 
 
+def _mcp(args) -> int:
+    """Serve Journeyman's read-only tools over MCP on stdio."""
+    from .mcp_server import main as serve
+
+    serve()
+    return 0
+
+
 def _brain(args) -> int:
     from .brain.models import check
     st = check()
@@ -537,6 +545,9 @@ def main(argv: list[str] | None = None) -> int:
     pr.add_argument("--interval", type=float, default=1.0)
     pr.add_argument("--notify", action="store_true", help="macOS banner when something goes red")
     pr.set_defaults(func=_pair)
+
+    mc = sub.add_parser("mcp", help="serve read-only tools to MCP clients (Claude Code, Cursor)")
+    mc.set_defaults(func=_mcp)
 
     bn = sub.add_parser("bench", help="measure the agent against hidden oracles")
     bn.add_argument("--cases", default=None)
