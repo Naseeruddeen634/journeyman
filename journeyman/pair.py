@@ -18,7 +18,10 @@ graph, and running them is pytest, and neither is improved by a language model.
 from __future__ import annotations
 
 import ast
+import json
+import re
 import subprocess
+import tempfile
 import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
@@ -167,11 +170,23 @@ class PairState:
         self.graph = import_graph(self.repo)
         messages: list[str] = []
         tests: set[Path] = set()
+        js_tests: set[Path] = set()
+        runner = js_runner(self.repo)
+        js_graph = js_import_graph(self.repo) if runner else {}
         for c in changed:
-            tests.update(affected_tests(self.repo, c, self.graph))
+            if Path(c).suffix in JS_SUFFIXES:
+                if runner:
+                    js_tests.update(affected_js_tests(self.repo, c, js_graph))
+            else:
+                tests.update(affected_tests(self.repo, c, self.graph))
 
+        runs = []
         if tests:
-            passed, failed, out = run_tests(self.repo, sorted(tests))
+            runs.append(run_tests(self.repo, sorted(tests)))
+        if js_tests:
+            p_, f_, first = run_js_tests(self.repo, sorted(js_tests), runner)
+            runs.append((p_, f_, first))
+        for passed, failed, out in runs:
             names = ", ".join(Path(c).name for c in changed)
             broke = sorted(t for t in failed if self.status.get(t) != "fail")
             healed = sorted(t for t in passed if self.status.get(t) == "fail")
@@ -181,7 +196,7 @@ class PairState:
                 self.status[t] = "fail"
             if broke:
                 first = next((l for l in out.splitlines() if "assert" in l.lower()
-                              or "Error" in l), "")
+                              or "Error" in l), "") if "\n" in out else out
                 messages.append(f"RED after saving {names}: {', '.join(broke[:3])}"
                                 + (f"\n      {first.strip()[:110]}" if first else ""))
             if healed:
@@ -206,14 +221,160 @@ class PairState:
         tests = sorted(f for f in self.graph if is_test(f, self.repo))
         passed, failed, _ = run_tests(self.repo, tests, timeout=600)
         self.status = {t: "pass" for t in passed} | {t: "fail" for t in failed}
+        runner = js_runner(self.repo)
+        if runner:
+            js = sorted(f for f in js_import_graph(self.repo) if is_js_test(f))
+            jp, jf, _ = run_js_tests(self.repo, js, runner, timeout=600)
+            self.status |= {t: "pass" for t in jp} | {t: "fail" for t in jf}
         for f in review(self.repo):
             self.findings.setdefault(f.where.split(":")[0], set()).add(f"{f.code}: {f.title}")
-        for f in self.graph:
+        for f in [*self.graph, *(_js_files(self.repo) if runner else [])]:
             self.findings.setdefault(str(f.resolve().relative_to(self.repo)), set())
 
 
+# ------------------------------------------------------------ TypeScript / JavaScript
+
+JS_SUFFIXES = (".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts")
+# Matched against the lexer's masked view, where string contents are blanked but
+# the quotes stay put, so an import written inside a string or comment is not one.
+_SPEC = re.compile(r"""(?:\bfrom\s*|\bimport\s*|\brequire\(\s*|\bimport\(\s*)(['"])""")
+
+
+def js_runner(repo: Path) -> str | None:
+    """vitest or jest, from package.json. None means no JavaScript tests to run."""
+    pkg = Path(repo) / "package.json"
+    if not pkg.exists():
+        return None
+    try:
+        data = json.loads(pkg.read_text(encoding="utf8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+    deps = {**data.get("dependencies", {}), **data.get("devDependencies", {})}
+    for name in ("vitest", "jest"):
+        if name in deps:
+            return name
+    return None
+
+
+def is_js_test(path: Path) -> bool:
+    n = path.name
+    return any(n.endswith(f".{kind}{suf}") for kind in ("test", "spec") for suf in JS_SUFFIXES) \
+        or "__tests__" in path.parts
+
+
+def _js_files(repo: Path) -> list[Path]:
+    return [p for p in repo.rglob("*") if p.suffix in JS_SUFFIXES and p.is_file()
+            and not p.name.endswith(".d.ts") and not skipped(p, repo)]
+
+
+def _resolve_js(importer: Path, spec: str) -> Path | None:
+    base = (importer.parent / spec)
+    stem = base.with_suffix("") if base.suffix in (".js", ".mjs", ".cjs", ".jsx") else base
+    candidates = [base] + [stem.with_suffix(s) for s in JS_SUFFIXES] + \
+                 [stem / f"index{s}" for s in JS_SUFFIXES]
+    for c in candidates:
+        if c.is_file():
+            return c.resolve()
+    return None
+
+
+def js_import_graph(repo: Path) -> dict[Path, set[Path]]:
+    """file -> relative imports it makes. Comments are stripped by the lexer first,
+    so an import in a comment does not create an edge."""
+    from .patterns.smells_ts import lex
+
+    graph: dict[Path, set[Path]] = {}
+    for f in _js_files(repo):
+        try:
+            lexed = lex(f.read_text(encoding="utf8", errors="ignore"))
+        except Exception:
+            graph[f.resolve()] = set()
+            continue
+        literal_at = {t.start: t.text for t in lexed.strings if t.kind == "quote"}
+        deps = set()
+        for m in _SPEC.finditer(lexed.masked):
+            spec = literal_at.get(m.start(1), "")
+            target = _resolve_js(f, spec) if spec.startswith(("./", "../")) else None
+            if target:
+                deps.add(target)
+        graph[f.resolve()] = deps
+    return graph
+
+
+def affected_js_tests(repo: str | Path, changed: str | Path,
+                      graph: dict[Path, set[Path]] | None = None) -> list[Path]:
+    repo = Path(repo).resolve()
+    changed = (repo / changed).resolve() if not Path(changed).is_absolute() else Path(changed).resolve()
+    graph = graph if graph is not None else js_import_graph(repo)
+    if is_js_test(changed):
+        return [changed]
+    reverse: dict[Path, set[Path]] = defaultdict(set)
+    for f, deps in graph.items():
+        for d in deps:
+            reverse[d].add(f)
+    seen, queue, tests = {changed}, deque([changed]), set()
+    while queue:
+        cur = queue.popleft()
+        for importer in reverse.get(cur, ()):
+            if importer in seen:
+                continue
+            seen.add(importer)
+            (tests.add if is_js_test(importer) else queue.append)(importer)
+    return sorted(tests)
+
+
+def run_js_tests(repo: Path, tests: list[Path], runner: str,
+                 timeout: int = 180) -> tuple[set[str], set[str], str]:
+    """(passed, failed, first failure line) from vitest --reporter=json or jest --json.
+
+    Both emit the same schema: testResults[].assertionResults[] with fullName and
+    status. Node ids are 'path::full name'.
+    """
+    if not tests or runner not in ("vitest", "jest"):
+        return set(), set(), ""
+    repo = repo.resolve()
+    files = [str(t.resolve().relative_to(repo)) for t in tests]
+    with tempfile.TemporaryDirectory() as tmp:
+        report = Path(tmp) / "report.json"
+        # The report goes to a file: a test's console.log also lands on stdout,
+        # and a brace in it would be mistaken for the start of the JSON.
+        argv = (["npx", "--no-install", "vitest", "run", "--reporter=json",
+                 f"--outputFile={report}", *files] if runner == "vitest"
+                else ["npx", "--no-install", "jest", "--json", f"--outputFile={report}", *files])
+        try:
+            r = subprocess.run(argv, cwd=repo, capture_output=True, text=True, timeout=timeout,
+                               env={**fresh_env(), "CI": "1", "FORCE_COLOR": "0"})
+        except (subprocess.TimeoutExpired, OSError) as exc:
+            return set(), set(), f"{runner} did not run: {exc}"
+        try:
+            data = json.loads(report.read_text(encoding="utf8"))
+        except (OSError, json.JSONDecodeError):
+            tail = (r.stderr or r.stdout).strip().splitlines()
+            return set(), {f"({runner} did not produce a report)"}, tail[-1][:160] if tail else ""
+    passed, failed, first = set(), set(), ""
+    for suite in data.get("testResults", []):
+        try:
+            rel = str(Path(suite.get("name", "")).resolve().relative_to(repo))
+        except ValueError:
+            rel = suite.get("name", "")
+        for a in suite.get("assertionResults", []):
+            node = f"{rel}::{a.get('fullName') or a.get('title')}"
+            if a.get("status") == "passed":
+                passed.add(node)
+            elif a.get("status") == "failed":
+                failed.add(node)
+                if not first and a.get("failureMessages"):
+                    first = a["failureMessages"][0].strip().splitlines()[0][:160]
+        if suite.get("status") == "failed" and not suite.get("assertionResults"):
+            failed.add(f"{rel}::(suite failed to load)")
+            lines = (suite.get("message") or "").strip().splitlines()
+            first = first or (lines[0][:160] if lines else "")
+    return passed, failed, first
+
+
 def snapshot(repo: Path) -> dict[Path, float]:
-    return {p: p.stat().st_mtime for p in _py_files(repo) if p.exists()}
+    files = _py_files(repo) + (_js_files(repo) if js_runner(repo) else [])
+    return {p: p.stat().st_mtime for p in files if p.exists()}
 
 
 def watch(repo: str | Path, interval: float = 1.0, settle: float = 0.6, notify=None,
