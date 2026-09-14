@@ -29,10 +29,15 @@ def main() -> int:
     a = ap.parse_args()
 
     import boto3
+    from botocore.config import Config
 
     repo = Path(a.repo).expanduser().resolve()
     payload = {"archive": pack(repo), "name": repo.name, "mode": a.mode, "prompt": a.prompt}
-    client = boto3.client("bedrock-agentcore", region_name=a.region)
+    # An explanation is a multi-turn model call on the service side; boto3's default 60 s read
+    # timeout cut it off. Adaptive retry because throttling is the normal case (AIE010, which
+    # Journeyman's own review raised on the first version of this script).
+    client = boto3.client("bedrock-agentcore", region_name=a.region,
+                          config=Config(read_timeout=300, retries={"mode": "adaptive", "max_attempts": 4}))
     resp = client.invoke_agent_runtime(
         agentRuntimeArn=a.arn, qualifier="DEFAULT",
         runtimeSessionId=f"journeyman-{uuid.uuid4()}",          # at least 33 characters
