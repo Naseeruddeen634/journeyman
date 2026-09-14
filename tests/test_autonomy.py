@@ -500,3 +500,29 @@ def test_gather_context_respects_its_size_cap(tmp_path):
     (tmp_path / "big.py").write_text("x = 1\n" * 5000)
     task = Task(kind="ai_review", title="t", detail="", where="big.py:1", priority=80)
     assert len(gather_context(tmp_path, task, limit_chars=2000)) <= 2000
+
+
+def test_arithmetic_in_a_summary_is_not_a_change_claim():
+    """Real benchmark summaries for two correct one-line fixes. Both were flagged
+    as over-claiming because their working was written as bullets."""
+    from journeyman.autonomy.shift import claims_vs_diff
+
+    summary = ("- Discount amount = 80 * 0.25 = 20\n"
+               "- Final price = 80 - 20 = 60\n\n"
+               "DONE: Fixed apply_discount to calculate percentage discounts.")
+    diff = ("--- a/lib/pricing.py\n+++ b/lib/pricing.py\n"
+            "-    return round(amount - percent, 2)\n"
+            "+    return round(amount * (1 - percent / 100), 2)\n")
+    assert claims_vs_diff(summary, diff) == []
+
+
+def test_the_real_over_claim_is_still_caught_after_tightening():
+    from journeyman.autonomy.shift import claims_vs_diff
+
+    summary = ("The fix involved:\n"
+               "1. Adding backticks around the ticket_text variable\n"
+               "2. Updating the system prompt to separate instructions from data\n")
+    diff = ("--- a/app/support.py\n+++ b/app/support.py\n"
+            '-    prompt = f"Reply to: {ticket_text}"\n'
+            '+    prompt = f"Reply to: `{ticket_text}`"\n')
+    assert claims_vs_diff(summary, diff)

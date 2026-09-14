@@ -87,7 +87,16 @@ def claims_vs_diff(summary: str, diff: str) -> list[str]:
     removed = [l for l in diff.splitlines() if l.startswith("-") and not l.startswith("---")]
     touched = max(len(added), len(removed))
 
-    claims = re.findall(r"^\s*(?:\d+[.)]|[-*])\s+(\S.{10,})$", summary, re.M)
+    bullets = re.findall(r"^\s*(?:\d+[.)]|[-*])\s+(\S.{10,})$", summary, re.M)
+    # Only bullets that describe a change are claims. The first version counted
+    # every bullet, so a correct one-line fix whose summary showed its arithmetic
+    # ("- Discount amount = 80 * 0.25 = 20") was flagged as over-claiming. In the
+    # benchmark that was 2 of 9 correct fixes, which is how a warning stops
+    # being read.
+    change = re.compile(r"\b(add|chang|updat|modif|wrap|replac|remov|delet|fix|mov|renam|"
+                        r"introduc|creat|wr[io]t|insert|refactor|extract|implement|adjust|"
+                        r"convert|swap|edit)\w*", re.I)
+    claims = [b for b in bullets if change.search(b)]
     if len(claims) >= 2 and touched <= 1:
         notes.append(
             f"It lists {len(claims)} changes but the diff moves {touched} line(s). "
