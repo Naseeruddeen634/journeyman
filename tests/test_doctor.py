@@ -122,3 +122,34 @@ def test_a_sandbox_that_stopped_enforcing_is_a_failure(monkeypatch, tmp_path):
     monkeypatch.setattr(jail, "wrap", lambda argv, work, env: (argv, {"PATH": "/bin:/usr/bin"}, True))
     c = doctor._confinement()
     assert c.status == "fail" and "did NOT block" in c.detail
+
+
+PMSET = """Battery Power:
+ Sleep On Power Button 1
+ displaysleep         2
+ sleep                1
+ disksleep            10
+AC Power:
+ Sleep On Power Button 1
+ displaysleep         10
+ sleep                {ac}
+ disksleep            10
+"""
+
+
+def test_power_settings_are_parsed_from_pmset():
+    assert doctor.pmset_sleep(PMSET.format(ac=1)) == {"Battery Power": 1, "AC Power": 1}
+    assert doctor.pmset_sleep("garbage") == {}
+
+
+@pytest.mark.parametrize("ac,status", [(1, "warn"), (0, "ok")])
+def test_a_machine_that_idle_sleeps_on_power_warns(monkeypatch, ac, status):
+    class R:
+        stdout = PMSET.format(ac=ac)
+    monkeypatch.setattr(doctor.sys, "platform", "darwin")
+    monkeypatch.setattr(doctor.shutil, "which", lambda name: "/usr/bin/pmset")
+    monkeypatch.setattr(doctor.subprocess, "run", lambda *a, **k: R())
+    check = doctor._power()
+    assert check.status == status
+    if status == "warn":
+        assert "after 1 min on power, 1 min on battery" in check.detail and "Prevent automatic sleeping" in check.fix

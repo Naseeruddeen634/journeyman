@@ -7,6 +7,7 @@ Each check here exists because the failure it looks for was real and silent:
   - macOS blocks background agents from ~/Downloads, ~/Documents, ~/Desktop.
   - The self-contained copy keeps running old code after the source changes.
   - A repo arrived red, so every honest fix looked STUCK until the gate changed.
+  - The laptop slept for three and a half hours in the middle of a benchmark.
 
 A check reports ok, warn or fail, says what it saw, and says what to do.
 """
@@ -182,6 +183,48 @@ def _scheduler() -> list[Check]:
     return out
 
 
+def pmset_sleep(text: str) -> dict[str, int]:
+    """{"Battery Power": minutes, "AC Power": minutes} from `pmset -g custom`. 0 means never."""
+    out, section = {}, None
+    for line in text.splitlines():
+        if line.rstrip().endswith(":") and not line.startswith(" "):
+            section = line.strip().rstrip(":")
+        elif section and line.split()[:1] == ["sleep"] and len(line.split()) >= 2:
+            try:
+                out[section] = int(line.split()[1])
+            except ValueError:
+                pass
+    return out
+
+
+def _power() -> Check:
+    """Will the machine be awake when the work is supposed to happen?
+
+    The development laptop idle-slept after one minute on power and on battery,
+    and a lid close in the middle of a benchmark paused it for 214 minutes. launchd
+    does not wake a sleeping Mac for a StartInterval job, so "works while you are
+    away" quietly becomes "works while you are away and the machine happens to be up".
+    Journeyman never changes power settings; this only says what they are.
+    """
+    if sys.platform != "darwin" or not shutil.which("pmset"):
+        return Check("stays awake", "skip", "power settings are only checked on macOS")
+    r = subprocess.run(["pmset", "-g", "custom"], capture_output=True, text=True, timeout=10)
+    sleep = pmset_sleep(r.stdout)
+    ac = sleep.get("AC Power")
+    if ac is None:
+        return Check("stays awake", "skip", "could not read pmset settings")
+    if ac == 0:
+        return Check("stays awake", "ok", "does not idle-sleep on power (a closed lid still sleeps)")
+    battery = sleep.get("Battery Power")
+    return Check(
+        "stays awake", "warn",
+        f"idle-sleeps after {ac} min on power" + (f", {battery} min on battery" if battery is not None else "")
+        + "; scheduled shifts do not run while it sleeps and a running one pauses",
+        "For unattended shifts keep it on power with the lid open and turn on System Settings > "
+        "Battery > Options > Prevent automatic sleeping on power adapter when the display is off, "
+        "or install on a machine that stays up.")
+
+
 def run(repo: str | Path | None = None) -> list[Check]:
     checks: list[Check] = []
     for fn in (_ollama_context, ):
@@ -193,6 +236,10 @@ def run(repo: str | Path | None = None) -> list[Check]:
         checks.append(_confinement())
     except Exception as exc:
         checks.append(Check("test confinement", "fail", f"check crashed: {exc}"))
+    try:
+        checks.append(_power())
+    except Exception as exc:
+        checks.append(Check("stays awake", "fail", f"check crashed: {exc}"))
     for group in (_other_brains, _tools, _scheduler):
         try:
             checks.extend(group())
