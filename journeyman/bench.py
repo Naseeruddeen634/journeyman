@@ -82,13 +82,16 @@ def _materialise(case_dir: Path, workdir: Path) -> Path:
 
 def _oracle(case_dir: Path, tree: Path) -> tuple[bool, str]:
     """Run the hidden checks against a tree the agent has finished with."""
+    from .autonomy import jail
+
     target = tree / "_journeyman_oracle_test.py"
     shutil.copy(case_dir / "oracle.py", target)
+    # the oracle imports and runs the agent's code, so it runs confined too
+    argv, env, _ = jail.wrap([sys.executable, "-m", "pytest", "-q", "--no-header",
+                              "-p", "no:cacheprovider", "--tb=short", target.name],
+                             tree, fresh_env())
     try:
-        r = subprocess.run(
-            [sys.executable, "-m", "pytest", "-q", "--no-header", "-p", "no:cacheprovider",
-             "--tb=short", target.name],
-            cwd=tree, capture_output=True, text=True, timeout=120, env=fresh_env())
+        r = subprocess.run(argv, cwd=tree, capture_output=True, text=True, timeout=120, env=env)
         return r.returncode == 0, (r.stdout + r.stderr)[-1500:]
     except subprocess.TimeoutExpired:
         return False, "oracle timed out"

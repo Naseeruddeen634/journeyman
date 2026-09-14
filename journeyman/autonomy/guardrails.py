@@ -97,6 +97,12 @@ class Sandbox:
     branch: str
     budget: Budget = field(default_factory=Budget)
     log: list[str] = field(default_factory=list)
+    confined: bool | None = None     # did test execution run under an OS sandbox
+
+    def __post_init__(self) -> None:
+        # macOS: /var is a symlink to /private/var; unresolved, write() raised
+        # when it computed the path relative to the root.
+        self.root = Path(self.root).resolve()
 
     # ---- paths -------------------------------------------------------
 
@@ -152,13 +158,53 @@ class Sandbox:
             env=_fresh({"GIT_TERMINAL_PROMPT": "0"}),
         )
 
+    def run_argv(self, argv: list[str], timeout: int = 120,
+                 jailed: bool = False) -> subprocess.CompletedProcess:
+        """Run a command as an argument list. No shell ever sees it.
+
+        The string version interpolated the agent's test target into a shell
+        command. On a machine whose Python lives under a path with a space in
+        it, that also meant the agent's run_tests tool was refused on every
+        call: the path split and 'untitled' was not on the allowlist.
+
+        jailed=True runs it inside the OS sandbox (see jail.py). Use it for
+        anything that executes the repository's code.
+        """
+        from . import jail
+
+        self.budget.spend_command()
+        exe = Path(argv[0]).name
+        if exe == "git" and len(argv) > 1 and (argv[1] in GIT_REFUSED or argv[1] not in GIT_ALLOWED):
+            raise Refused(f"refused, `git {argv[1]}` is not allowed unattended")
+        env = _fresh({"GIT_TERMINAL_PROMPT": "0"})
+        if jailed:
+            argv, env, confined = jail.wrap(list(argv), self.root, env)
+            self.confined = confined if self.confined is None else (self.confined and confined)
+        self.log.append("$ " + " ".join(argv[3:] if jailed and argv[:1] == [str(jail.SANDBOX_EXEC)]
+                                        else argv))
+        return subprocess.run(argv, cwd=self.root, capture_output=True, text=True,
+                              timeout=timeout, env=env)
+
     def _git(self, args: list[str]) -> str:
         r = subprocess.run(["git", *args], cwd=self.root, capture_output=True, text=True)
         return r.stdout
 
 
+SHELL_ESCAPES = re.compile(r"\$\(|`|\$\{|(?<![&|])&(?!&)|[<>]|\n|\r")
+
+
 def check_command(command: str) -> None:
-    """Allowlist check. Raises Refused rather than returning False."""
+    """Allowlist check. Raises Refused rather than returning False.
+
+    Probed with harmless canaries, the first version let through command
+    substitution, backticks and redirects: `python -m pytest $(...)` passed
+    because only each segment's first word was checked. Shift code no longer
+    sends agent-influenced strings to a shell at all (see Sandbox.run_argv),
+    and this refuses the shell features that would let a string escape the
+    allowlist regardless.
+    """
+    if SHELL_ESCAPES.search(command):
+        raise Refused(f"refused, uses shell substitution, redirection or backgrounding: {command!r}")
     if DANGEROUS.search(command):
         raise Refused(f"refused, matches a dangerous pattern: {command!r}")
 

@@ -144,6 +144,7 @@ class ShiftResult:
     outcome: str = "no_work"     # fixed | fixed_with_concerns | stuck | regressed | refused | no_work | error
     concerns: list[str] = field(default_factory=list)
     stopped_by: str = ""
+    confined: bool | None = None
     feedback_rounds: int = 0
     feedback: list[str] = field(default_factory=list)
     finding_resolved: bool | None = None
@@ -166,7 +167,7 @@ class ShiftResult:
             "branch": self.branch, "outcome": self.outcome, "green": self.green,
             "files_changed": self.files_changed, "commit": self.commit,
             "summary": self.summary, "brain": self.brain, "concerns": self.concerns,
-            "stopped_by": self.stopped_by,
+            "stopped_by": self.stopped_by, "confined": self.confined,
             "feedback_rounds": self.feedback_rounds, "feedback": self.feedback,
             "finding_resolved": self.finding_resolved,
             "findings_introduced": self.findings_introduced,
@@ -180,7 +181,7 @@ class ShiftResult:
 FAIL_LINE = re.compile(r"^(?:FAILED|ERROR)\s+(\S+)", re.M)
 
 
-def failing_set(repo: Path) -> tuple[set[str], str]:
+def failing_set(repo: Path, jail: bool = False) -> tuple[set[str], str]:
     """Which tests are red right now, as a set of node ids.
 
     The gate cannot be "the suite is green". Plenty of real repositories are
@@ -190,12 +191,17 @@ def failing_set(repo: Path) -> tuple[set[str], str]:
 
     What matters is whether the agent broke anything that was working.
     """
+    from . import jail as _jail
     from .scout import _interpreter, fresh_env
 
+    argv = [_interpreter(repo), "-m", "pytest", "-q", "--no-header", "--tb=no",
+            "-p", "no:cacheprovider"]
+    env = fresh_env()
+    if jail:
+        # The agent has edited this code. Running it runs the agent's code.
+        argv, env, _ = _jail.wrap(argv, Path(repo), env)
     try:
-        r = subprocess.run(
-            [_interpreter(repo), "-m", "pytest", "-q", "--no-header", "--tb=no"],
-            cwd=repo, capture_output=True, text=True, timeout=300, env=fresh_env())
+        r = subprocess.run(argv, cwd=repo, capture_output=True, text=True, timeout=300, env=env)
     except (subprocess.TimeoutExpired, OSError) as exc:
         return set(), f"could not run the suite: {exc}"
     out = r.stdout + r.stderr
@@ -299,7 +305,7 @@ def progress_check(root: Path, task: Task, fail_before: set[str],
     wrong.
     """
     problems: list[str] = []
-    after, out = failing_set(root)
+    after, out = failing_set(root, jail=True)
 
     if not changed:
         problems.append("You have not changed any file.")
@@ -404,11 +410,20 @@ def _tools_for(sandbox: Sandbox, result: ShiftResult, task: Task | None = None):
         """
         from .scout import _interpreter
 
-        cmd = f"{_interpreter(sandbox.root)} -m pytest -q --no-header --tb=short"
+        argv = [_interpreter(sandbox.root), "-m", "pytest", "-q", "--no-header", "--tb=short",
+                "-p", "no:cacheprovider"]
         if target:
-            cmd += f" {target}"
+            # A path inside the sandbox, optionally with a ::node id. Nothing else.
+            path, _, node = target.strip().partition("::")
+            if not re.fullmatch(r"[\w./-]+", path) or (node and not re.fullmatch(r"[\w:\[\]./-]+", node)):
+                return f"Refused: {target!r} is not a test path inside the repository."
+            try:
+                sandbox.resolve(path)
+            except Refused as exc:
+                return f"Refused: {exc}"
+            argv.append(target.strip())
         try:
-            r = sandbox.run(cmd, timeout=300)
+            r = sandbox.run_argv(argv, timeout=300, jailed=True)
         except Refused as exc:
             return f"Refused: {exc}"
         except subprocess.TimeoutExpired:
@@ -425,7 +440,7 @@ def _tools_for(sandbox: Sandbox, result: ShiftResult, task: Task | None = None):
             The current diff against the branch point.
         """
         try:
-            r = sandbox.run("git diff", timeout=60)
+            r = sandbox.run_argv(["git", "diff"], timeout=60)
         except Refused as exc:
             return f"Refused: {exc}"
         return (r.stdout or "(no changes yet)")[:6000]
@@ -503,7 +518,7 @@ def work_one(repo: str | Path, task: Task | None = None, budget: Budget | None =
 
     # Baseline before the agent touches anything, inside the sandbox so it is
     # the same tree the agent will work in.
-    before, before_out = failing_set(sandbox.root)
+    before, before_out = failing_set(sandbox.root, jail=True)
     result.failures_before = sorted(before)
     result.tests_before = before_out
 
@@ -572,9 +587,11 @@ def work_one(repo: str | Path, task: Task | None = None, budget: Budget | None =
         watchdog.cancel()
 
     result.stopped_by = guard.stopped_by
+    from . import jail as _jail
+    result.confined = _jail.available()
 
     # ---- verify for ourselves. The agent's own claim is not evidence. ----
-    after, after_out = failing_set(sandbox.root)
+    after, after_out = failing_set(sandbox.root, jail=True)
     result.failures_after = sorted(after)
     result.tests_after = after_out
     result.new_failures = sorted(after - before)
@@ -582,7 +599,7 @@ def work_one(repo: str | Path, task: Task | None = None, budget: Budget | None =
     result.green = not after
 
     result.files_changed = sandbox.changed_files()
-    result.diff = sandbox.run("git diff").stdout if result.files_changed else ""
+    result.diff = sandbox.run_argv(["git", "diff"]).stdout if result.files_changed else ""
     result.log = sandbox.log
     result.budget = budget.to_dict()
 
@@ -630,12 +647,12 @@ def work_one(repo: str | Path, task: Task | None = None, budget: Budget | None =
             result.summary = (f"Changed {len(result.files_changed)} files, over the limit of "
                               f"{budget.max_files_changed}. Left uncommitted for review.")
         else:
-            sandbox.run("git add -A")
+            sandbox.run_argv(["git", "add", "-A"])
             msg = f"{task.title[:68]}\n\nWorked unattended by Journeyman on {stamp}.\nTask: {task.kind} at {task.where}\n"
             (sandbox.root / ".git_commit_msg").write_text(msg, encoding="utf8")
-            sandbox.run("git commit -F .git_commit_msg")
+            sandbox.run_argv(["git", "commit", "-q", "-F", ".git_commit_msg"])
             (sandbox.root / ".git_commit_msg").unlink(missing_ok=True)
-            result.commit = sandbox.run("git rev-parse --short HEAD").stdout.strip()
+            result.commit = sandbox.run_argv(["git", "rev-parse", "--short", "HEAD"]).stdout.strip()
 
     result.finished = time.time()
     close_sandbox(repo, sandbox, keep=keep_worktree)
@@ -676,6 +693,8 @@ def report(result: ShiftResult) -> str:
         lines.append(f"  STOPPED   {result.stopped_by}")
     if result.feedback_rounds:
         lines.append(f"  feedback  sent back {result.feedback_rounds} time(s) after claiming done")
+    if result.confined is False:
+        lines.append("  UNCONFINED  the repository's tests ran without an OS sandbox on this platform")
     if result.finding_resolved is not None:
         lines.append(f"  finding   {'resolved' if result.finding_resolved else 'STILL THERE'}"
                      + (f", introduced {', '.join(result.findings_introduced)}"
