@@ -97,13 +97,38 @@ def _interpreter(repo: Path) -> str:
     Running the repo's tests with the wrong interpreter reports an import error
     as a failing test, which sends the agent off to fix a bug that does not
     exist. Worth the six lines.
+
+    A shift runs in a git worktree, and a worktree does not contain the untracked
+    .venv, so the lookup has to include the checkout the worktree belongs to.
+    Without that, a repo whose tests pass in place had them fail in the sandbox
+    with ImportError, because they ran under Journeyman's own interpreter.
     """
-    for candidate in (repo / ".venv" / "bin" / "python",
-                      repo / "venv" / "bin" / "python",
-                      repo / ".venv" / "Scripts" / "python.exe"):
-        if candidate.exists():
-            return str(candidate)
+    roots = [Path(repo)]
+    main = main_worktree(repo)
+    if main is not None and main != Path(repo).resolve():
+        roots.append(main)
+    for root in roots:
+        for candidate in (root / ".venv" / "bin" / "python",
+                          root / "venv" / "bin" / "python",
+                          root / ".venv" / "Scripts" / "python.exe"):
+            if candidate.exists():
+                return str(candidate)
     return sys.executable
+
+
+def main_worktree(path: Path) -> Path | None:
+    """The checkout a git worktree belongs to (the repo itself when it is not a worktree)."""
+    try:
+        r = subprocess.run(["git", "rev-parse", "--git-common-dir"], cwd=path,
+                           capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if r.returncode != 0 or not r.stdout.strip():
+        return None
+    common = Path(r.stdout.strip())
+    if not common.is_absolute():
+        common = Path(path) / common
+    return common.resolve().parent
 
 
 def failing_tests(repo: Path, timeout: int = 300) -> list[Task]:
@@ -115,7 +140,7 @@ def failing_tests(repo: Path, timeout: int = 300) -> list[Task]:
         )
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
         return []
-    if r.returncode == 0:
+    if r.returncode in (0, 5):          # 5: no tests collected, which is not a red test
         return []
 
     out = r.stdout + r.stderr

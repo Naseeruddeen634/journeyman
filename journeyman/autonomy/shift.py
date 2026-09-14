@@ -220,6 +220,11 @@ class ShiftResult:
 
 
 FAIL_LINE = re.compile(r"^(?:FAILED|ERROR)\s+(\S+)", re.M)
+# Stands in the failing set when pytest itself could not run. Without it, a suite
+# that cannot start has no FAILED lines and reads as green: a conftest.py that no
+# longer imports made pytest exit 4 and failing_set return nothing, so a change
+# that broke the whole suite would have "fixed" every failing test.
+SUITE_DID_NOT_RUN = "(the test suite did not run)"
 
 
 def failing_set(repo: Path, jail: bool = False) -> tuple[set[str], str]:
@@ -244,9 +249,14 @@ def failing_set(repo: Path, jail: bool = False) -> tuple[set[str], str]:
     try:
         r = subprocess.run(argv, cwd=repo, capture_output=True, text=True, timeout=300, env=env)
     except (subprocess.TimeoutExpired, OSError) as exc:
-        return set(), f"could not run the suite: {exc}"
+        return {SUITE_DID_NOT_RUN}, f"could not run the suite: {exc}"
     out = r.stdout + r.stderr
-    return set(FAIL_LINE.findall(out)), out[-2500:]
+    failing = set(FAIL_LINE.findall(out))
+    # pytest exit codes: 0 passed, 1 tests failed, 2 interrupted, 3 internal error,
+    # 4 usage error (a conftest that does not import), 5 no tests collected
+    if r.returncode in (3, 4) or (r.returncode not in (0, 5) and not failing):
+        failing.add(SUITE_DID_NOT_RUN)
+    return failing, out[-2500:]
 
 
 def finding_counts(root: Path, file: str) -> dict[str, int]:
@@ -575,6 +585,15 @@ def work_one(repo: str | Path, task: Task | None = None, budget: Budget | None =
     before, before_out = failing_set(sandbox.root, jail=True)
     result.failures_before = sorted(before)
     result.tests_before = before_out
+    if SUITE_DID_NOT_RUN in before:
+        # Nothing the agent does could be verified. Say so instead of guessing.
+        tail = before_out.strip().splitlines()[-1] if before_out.strip() else ""
+        result.outcome = "refused"
+        result.summary = ("The test suite does not run in the sandbox, so no change could be "
+                          f"verified. Nothing was attempted. pytest said: {tail[:200]}")
+        result.finished = time.time()
+        close_sandbox(repo, sandbox, keep=False)
+        return result
 
     review_file = task.where.split(":")[0]
     review_code = task.meta.get("code", "")
