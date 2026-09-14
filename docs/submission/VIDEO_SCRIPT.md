@@ -11,7 +11,7 @@ Open **Terminal** and run:
 conda deactivate 2>/dev/null; PROMPT='$ '; clear
 cd ~/code/helpdesk-ai && git checkout -q main
 export PATH="$HOME/Downloads/untitled folder/journeyman/.venv/bin:$PATH"
-export ARN="arn:aws:bedrock-agentcore:us-east-1:625495455013:runtime/journeyman_reviewer-wfyBrj5ruB"
+export ARN="$(awk '/agent_arn:/{print $2}' ~/.journeyman/agentcore-build/.bedrock_agentcore.yaml)"
 export CAP="$HOME/Downloads/untitled folder/journeyman/docs/submission/captured"
 aws sts get-caller-identity > /dev/null && echo AWS-OK
 clear
