@@ -125,7 +125,7 @@ def _shift(args) -> int:
     status = check()
     print(f"\n  Journeyman night shift")
     print(f"  {status.summary()}\n")
-    if not (status.local_available or status.heavy_available):
+    if not (status.local_available or status.heavy_available or status.bedrock_available):
         print("  No brain available. Nothing will happen.\n", file=sys.stderr)
         return 2
 
@@ -138,13 +138,13 @@ def _shift(args) -> int:
     result = work_one(args.repo, budget=budget, keep_worktree=not args.cleanup)
     print(report(result))
 
-    outdir = Path(args.repo) / ".journeyman" / "shifts"
-    outdir.mkdir(parents=True, exist_ok=True)
-    stamp = __import__("time").strftime("%Y%m%d-%H%M%S")
-    (outdir / f"{stamp}.json").write_text(
-        json.dumps(result.to_dict(), indent=2, default=str), encoding="utf8")
-    print(f"  full record: {outdir / (stamp + '.json')}\n")
-    return 0 if result.outcome in ("fixed", "no_work") else 1
+    # One place for every shift, manual or scheduled, so history and propose
+    # see all of them. Manual runs used to write into the repo instead.
+    path = record_shift(str(Path(args.repo).resolve()), result.to_dict())
+    print(f"  full record: {path}\n")
+    if result.outcome in ("fixed", "fixed_with_concerns"):
+        print(f"  Turn it into a pull request:  journeyman propose --repo {args.repo}\n")
+    return 0 if result.outcome in ("fixed", "fixed_with_concerns", "no_work") else 1
 
 
 def _watch(args) -> int:
@@ -158,7 +158,7 @@ def _watch(args) -> int:
     print(f"  {status.summary()}")
     print(f"  up to {args.max_shifts} shifts over {args.max_hours}h, "
           f"checking every {args.interval}s\n")
-    if not (status.local_available or status.heavy_available):
+    if not (status.local_available or status.heavy_available or status.bedrock_available):
         print("  No brain available.\n", file=sys.stderr)
         return 2
 
@@ -168,12 +168,9 @@ def _watch(args) -> int:
         on_shift=lambda r: print(report(r), flush=True),
     )
     print(morning_report(log))
-    outdir = Path(args.repo) / ".journeyman" / "watch"
-    outdir.mkdir(parents=True, exist_ok=True)
-    stamp = __import__("time").strftime("%Y%m%d-%H%M%S")
-    (outdir / f"{stamp}.json").write_text(
-        json.dumps(log.to_dict(), indent=2, default=str), encoding="utf8")
-    print(f"  full record: {outdir / (stamp + '.json')}\n")
+    for s in log.shifts:
+        record_shift(str(Path(args.repo).resolve()), s.to_dict())
+    print(f"  {len(log.shifts)} shift record(s) written to {HOME / 'shifts'}\n")
     return 0
 
 
@@ -299,6 +296,27 @@ def _pair(args) -> int:
     return 0
 
 
+def _propose(args) -> int:
+    """Write the pull request description. You push and open it."""
+    from .propose import propose
+
+    r = propose(args.repo, args.branch)
+    if not r["ok"]:
+        print(f"\n  {r['reason']}\n", file=sys.stderr)
+        return 1
+    print(f"\n  {r['title']}")
+    print(f"  {r['branch']} -> {r['base']}")
+    if r["concerns"]:
+        print(f"  The agent flagged {r['concerns']} concern(s) about its own change. "
+              "They are at the top of the description.")
+    print(f"\n  Description: {r['body_file']}\n")
+    print("  Journeyman does not push or open pull requests. When you have read the diff:\n")
+    for c in r["commands"]:
+        print(f"    {c}")
+    print()
+    return 0
+
+
 def _brain(args) -> int:
     from .brain.models import check
     st = check()
@@ -381,6 +399,11 @@ def main(argv: list[str] | None = None) -> int:
     rs.add_argument("--repo", action="append")
     rs.add_argument("--max-shifts", type=int, default=2)
     rs.set_defaults(func=_run_scheduled)
+
+    po = sub.add_parser("propose", help="write the PR description for a delivered shift")
+    po.add_argument("--repo", default=".")
+    po.add_argument("--branch", default=None)
+    po.set_defaults(func=_propose)
 
     pr = sub.add_parser("pair", help="work beside you: affected tests on save, quiet unless red")
     pr.add_argument("--repo", default=".")
