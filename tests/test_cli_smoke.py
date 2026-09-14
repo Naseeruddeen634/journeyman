@@ -17,6 +17,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 
 SUBCOMMANDS = ["build", "memory", "forget", "scout", "review", "eval", "propose", "pair", "ci", "doctor",
+               "inventory",
                "mcp", "bench", "shift", "watch", "install", "uninstall", "status",
                "run-scheduled", "brain"]
 

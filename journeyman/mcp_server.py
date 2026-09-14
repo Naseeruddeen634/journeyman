@@ -20,7 +20,7 @@ from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 
-INSTRUCTIONS = """Journeyman reviews and inspects Python repositories the way an AI engineer
+INSTRUCTIONS = """Journeyman reviews and inspects Python and TypeScript repositories the way an AI engineer
 would. All tools are read-only. Pass `repo` as an absolute path to a directory.
 Findings carry `why` and `fix`; relay those rather than paraphrasing them away.
 To have Journeyman actually fix something, the user runs `journeyman shift`."""
@@ -88,6 +88,17 @@ def run_affected_tests(repo: str, file: str) -> dict:
     return {"tests": [str(t.relative_to(root)) for t in tests],
             "passed": sorted(passed), "failed": sorted(failed),
             "output_tail": tail if failed else ""}
+
+
+@server.tool(annotations=READ_ONLY)
+def inventory(repo: str) -> dict:
+    """Every model call site in the repo (Python and TypeScript): the provider, the
+    model id or the environment variable it comes from, whether output is bounded,
+    and whether the text leaves the machine. Plus each prompt file's eval status.
+    Static analysis only; nothing is executed."""
+    from .inventory import build
+
+    return build(_repo(repo)).to_dict()
 
 
 @server.tool(annotations=READ_ONLY)

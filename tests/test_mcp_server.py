@@ -25,7 +25,8 @@ def test_every_tool_is_read_only():
     """Editing stays with the sandboxed shift. A remote caller gets no second path around it."""
     tools = asyncio.run(server.list_tools())
     assert {t.name for t in tools} == {
-        "review", "scout", "affected_tests", "run_affected_tests", "eval_status", "shift_history"}
+        "review", "scout", "affected_tests", "run_affected_tests", "eval_status", "shift_history",
+        "inventory"}
     for t in tools:
         assert t.annotations.read_only_hint is True, t.name
         assert t.annotations.destructive_hint is False, t.name

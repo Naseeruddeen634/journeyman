@@ -492,6 +492,17 @@ def _ci(args) -> int:
     return 0
 
 
+def _inventory(args) -> int:
+    """Every model call in the repo, which model, and where the text goes."""
+    import json
+
+    from .inventory import build, render
+
+    inv = build(args.repo)
+    print(json.dumps(inv.to_dict(), indent=2) if args.format == "json" else render(inv))
+    return 0
+
+
 def _doctor(args) -> int:
     """Check for every silent failure found while building this."""
     from .doctor import render, run
@@ -619,6 +630,11 @@ def main(argv: list[str] | None = None) -> int:
     ci.add_argument("--fail-on", type=int, default=80)
     ci.add_argument("--overwrite", action="store_true")
     ci.set_defaults(func=_ci)
+
+    iv = sub.add_parser("inventory", help="every model call: which model, output limit, where the text goes")
+    iv.add_argument("--repo", default=".")
+    iv.add_argument("--format", choices=["text", "json"], default="text")
+    iv.set_defaults(func=_inventory)
 
     dr = sub.add_parser("doctor", help="check for every silent failure found the hard way")
     dr.add_argument("--repo", default=".")
