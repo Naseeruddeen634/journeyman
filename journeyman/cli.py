@@ -261,6 +261,32 @@ def _run_scheduled(args) -> int:
     return 0
 
 
+def _bench(args) -> int:
+    """Measure the agent against cases with hidden oracles."""
+    from . import bench
+    from .autonomy.guardrails import Budget
+
+    cases = Path(args.cases) if args.cases else bench.DEFAULT_CASES
+    print(f"\n  Journeyman bench   {cases}   feedback rounds: {args.feedback}\n", flush=True)
+    summary = bench.run(
+        cases, only=args.only, feedback_rounds=args.feedback,
+        budget_factory=lambda: Budget(max_minutes=args.max_minutes,
+                                      max_iterations=args.max_iterations),
+        on_case=lambda r: print(f"  {r.case:<20} {r.outcome or 'error':<21} "
+                                f"oracle {'pass' if r.oracle_passed else 'fail'}  "
+                                f"{r.minutes} min", flush=True),
+    )
+    print(bench.render(summary))
+    ensure()
+    out = HOME / "bench"
+    out.mkdir(exist_ok=True)
+    stamp = __import__("time").strftime("%Y%m%d-%H%M%S")
+    path = out / f"{stamp}-fb{args.feedback}.json"
+    path.write_text(json.dumps(summary, indent=2, default=str), encoding="utf8")
+    print(f"  {path}\n")
+    return 0
+
+
 def _brain(args) -> int:
     from .brain.models import check
     st = check()
@@ -343,6 +369,14 @@ def main(argv: list[str] | None = None) -> int:
     rs.add_argument("--repo", action="append")
     rs.add_argument("--max-shifts", type=int, default=2)
     rs.set_defaults(func=_run_scheduled)
+
+    bn = sub.add_parser("bench", help="measure the agent against hidden oracles")
+    bn.add_argument("--cases", default=None)
+    bn.add_argument("--only", nargs="*", default=None)
+    bn.add_argument("--feedback", type=int, default=2, help="harness feedback rounds")
+    bn.add_argument("--max-minutes", type=float, default=10.0)
+    bn.add_argument("--max-iterations", type=int, default=20)
+    bn.set_defaults(func=_bench)
 
     br = sub.add_parser("brain", help="which models are available")
     br.set_defaults(func=_brain)

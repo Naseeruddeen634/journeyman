@@ -135,6 +135,8 @@ class ShiftResult:
     outcome: str = "no_work"     # fixed | fixed_with_concerns | stuck | regressed | refused | no_work | error
     concerns: list[str] = field(default_factory=list)
     stopped_by: str = ""
+    feedback_rounds: int = 0
+    feedback: list[str] = field(default_factory=list)
     finding_resolved: bool | None = None
     findings_introduced: list[str] = field(default_factory=list)
     failures_before: list[str] = field(default_factory=list)
@@ -156,6 +158,7 @@ class ShiftResult:
             "files_changed": self.files_changed, "commit": self.commit,
             "summary": self.summary, "brain": self.brain, "concerns": self.concerns,
             "stopped_by": self.stopped_by,
+            "feedback_rounds": self.feedback_rounds, "feedback": self.feedback,
             "finding_resolved": self.finding_resolved,
             "findings_introduced": self.findings_introduced,
             "failures_before": self.failures_before, "failures_after": self.failures_after,
@@ -212,6 +215,52 @@ def resolution(code: str, before: dict[str, int], after: dict[str, int]) -> tupl
     resolved = after.get(code, 0) < before.get(code, 0)
     introduced = sorted(c for c, n in after.items() if n > before.get(c, 0))
     return resolved, introduced
+
+
+FEEDBACK = """Not done yet. I checked your work independently, and this is what I found:
+
+{feedback}
+
+Fix the underlying cause. Do not edit or delete tests to make them pass, and do
+not delete the code the check is looking at. When it is genuinely fixed, reply
+with a one-line summary starting with DONE:. If you cannot fix it, reply with
+STUCK: and what you think is going on."""
+
+
+def progress_check(root: Path, task: Task, fail_before: set[str],
+                   findings_before: dict[str, int], changed: list[str]) -> tuple[bool, str]:
+    """The same test the shift applies at the end, run while there is still time to act.
+
+    An agent that says DONE has made a claim. In real runs it said DONE with the
+    finding still firing and turns left in the budget. The cheapest fix for that
+    is the one a senior engineer uses on a junior: look, and say what is still
+    wrong.
+    """
+    problems: list[str] = []
+    after, out = failing_set(root)
+
+    if not changed:
+        problems.append("You have not changed any file.")
+    new = sorted(after - fail_before)
+    if new:
+        problems.append("These tests passed before your change and fail now:\n  "
+                        + "\n  ".join(new) + "\n\n" + out[-1500:])
+    if task.kind == "failing_test" and not (fail_before - after):
+        problems.append("The test you were sent to fix is still failing:\n\n" + out[-1500:])
+    if task.kind == "ai_review" and task.meta.get("code"):
+        from ..patterns.smells import review
+
+        code, target = task.meta["code"], task.where.split(":")[0]
+        still = [f for f in review(root) if f.code == code and f.where.split(":")[0] == target]
+        if still and len(still) >= findings_before.get(code, 0):
+            lines = [f"{code} still fires on {target}:"]
+            for f in still[:2]:
+                lines.append(f"  line {f.where.rsplit(':', 1)[-1]}: {f.title}")
+                if f.evidence:
+                    lines.append(f"    {f.evidence}")
+            lines.append(f"\nWhat resolves it: {still[0].fix}")
+            problems.append("\n".join(lines))
+    return (not problems, "\n\n".join(problems))
 
 
 def _tools_for(sandbox: Sandbox, result: ShiftResult, task: Task | None = None):
@@ -354,7 +403,8 @@ def _tools_for(sandbox: Sandbox, result: ShiftResult, task: Task | None = None):
 
 
 def work_one(repo: str | Path, task: Task | None = None, budget: Budget | None = None,
-             difficulty: str = "routine", keep_worktree: bool = True) -> ShiftResult:
+             difficulty: str = "routine", keep_worktree: bool = True,
+             max_feedback_rounds: int = 2) -> ShiftResult:
     """Do one task, end to end, unattended."""
     repo = Path(repo).resolve()
     budget = budget or Budget()
@@ -418,8 +468,19 @@ def work_one(repo: str | Path, task: Task | None = None, budget: Budget | None =
     )
 
     try:
-        response = agent(brief)
-        result.summary = str(response)[-600:].strip()
+        prompt = brief
+        for round_no in range(max_feedback_rounds + 1):
+            response = agent(prompt)
+            result.summary = str(response)[-600:].strip()
+            if guard.stopped_by or round_no == max_feedback_rounds:
+                break
+            ok, feedback = progress_check(sandbox.root, task, before, findings_before,
+                                          sandbox.changed_files())
+            if ok:
+                break
+            result.feedback_rounds += 1
+            result.feedback.append(feedback[:1200])
+            prompt = FEEDBACK.format(feedback=feedback)
     except Refused as exc:
         result.outcome, result.summary = "refused", str(exc)
     except Exception as exc:
@@ -529,6 +590,8 @@ def report(result: ShiftResult) -> str:
     lines.append(f"  took      {result.minutes} min")
     if result.stopped_by:
         lines.append(f"  STOPPED   {result.stopped_by}")
+    if result.feedback_rounds:
+        lines.append(f"  feedback  sent back {result.feedback_rounds} time(s) after claiming done")
     if result.finding_resolved is not None:
         lines.append(f"  finding   {'resolved' if result.finding_resolved else 'STILL THERE'}"
                      + (f", introduced {', '.join(result.findings_introduced)}"

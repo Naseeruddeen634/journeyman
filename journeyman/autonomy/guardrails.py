@@ -54,7 +54,7 @@ class Budget:
     max_minutes: float = 45.0
     max_files_changed: int = 12
     max_commands: int = 120
-    max_iterations: int = 8
+    max_iterations: int = 20         # model turns, across feedback rounds
     max_heavy_calls: int = 6          # calls to the paid model
 
     commands_run: int = 0
