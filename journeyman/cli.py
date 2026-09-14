@@ -95,7 +95,16 @@ def _review(args) -> int:
     """Review this repo the way an AI engineer would."""
     from .patterns.smells import review, summarise
 
-    findings = review(args.repo)
+    already = 0
+    if args.new_since:
+        from .ci import RefError, new_findings
+        try:
+            findings, already = new_findings(Path(args.repo), args.new_since)
+        except RefError as exc:
+            print(f"\n  {exc}\n", file=sys.stderr)
+            return 2
+    else:
+        findings = review(args.repo)
     failing = any(f.severity >= args.fail_on for f in findings)
 
     if args.format != "text":
@@ -106,7 +115,12 @@ def _review(args) -> int:
             print(out)
         return 1 if failing else 0
 
-    print(f"\n  {summarise(findings)}\n")
+    if args.new_since:
+        head = (f"{len(findings)} finding(s) introduced since {args.new_since}" if findings
+                else f"Nothing new since {args.new_since}")
+        print(f"\n  {head} ({already} already there, not counted)\n")
+    else:
+        print(f"\n  {summarise(findings)}\n")
     if not findings:
         print("  Nothing to flag.\n")
         return 0
@@ -561,6 +575,8 @@ def main(argv: list[str] | None = None) -> int:
     rv.add_argument("--format", choices=["text", "json", "github", "sarif"], default="text")
     rv.add_argument("--fail-on", type=int, default=80, metavar="SEVERITY",
                     help="exit 1 if any finding is at least this severe (default 80)")
+    rv.add_argument("--new-since", metavar="REF",
+                    help="only findings the changes since REF introduced, e.g. origin/main")
     rv.set_defaults(func=_review)
 
     sh = sub.add_parser("shift", help="work one task unattended and report")
