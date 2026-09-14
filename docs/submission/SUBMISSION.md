@@ -38,9 +38,13 @@ Strands Agents throughout:
   to enforce the wall clock during a single generation.
 - The independent spec check is two more Strands agents that never see the worker's code: they write
   tests from the task and the pre-change docstrings, and the change must pass them.
-- Three brains through Strands model providers: Qwen3-Coder on Ollama locally (every benchmark run), Kimi K3 through an
-  OpenAI-compatible API, and Claude on Amazon Bedrock. The `build` engine uses `GraphBuilder` with
-  bounded cycles.
+- Brains through Strands model providers: Qwen3-Coder on Ollama locally (every benchmark run) and
+  Claude on Amazon Bedrock (the live demo and the AgentCore service). Kimi K3 through an
+  OpenAI-compatible API is supported but was not run for this submission. The `build` engine uses
+  `GraphBuilder` with bounded cycles.
+- The reviewer is deployed on Amazon Bedrock AgentCore Runtime (direct code deploy, us-east-1): a
+  `BedrockAgentCoreApp` entrypoint around deterministic checks, with a Strands agent on Claude in
+  Bedrock that explains findings through a read-only, repository-confined tool.
 - Tests the agent causes to run execute under the macOS sandbox with no network and no access to
   credential stores.
 
@@ -53,6 +57,13 @@ our own stack: Ollama's 4096-token default context silently discarding the task,
 could not start reading as green, and sandboxed tests running under the wrong Python.
 
 ## Accomplishments
+Live on AWS, captured in the repository:
+- The AgentCore reviewer returned six findings on the demo app in 4.7 seconds; with an explanation
+  from Claude on Bedrock, about 20 seconds.
+- On the same failing test, the local model's fix passed the visible test but dropped the system
+  message; the independent checker caught it and it was not committed. Claude on Bedrock's fix passed
+  the visible test and all ten independent tests in 0.8 minutes, and `propose` wrote the PR text.
+
 Measured against hidden oracles the agent never sees, on a local 30B model:
 - 12 routine bugs, three runs: 35 of 36 correct, no wrong fix delivered.
 - 5 hard bugs, three runs: without the spec check, 3 of 15 correct and 10 wrong fixes delivered; with

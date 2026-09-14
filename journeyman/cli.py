@@ -588,7 +588,9 @@ def main(argv: list[str] | None = None) -> int:
     sh.add_argument("--max-minutes", type=float, default=45.0)
     sh.add_argument("--max-files", type=int, default=12)
     sh.add_argument("--max-commands", type=int, default=120)
-    sh.add_argument("--max-iterations", type=int, default=8)
+    # 20, like the benchmark and the scheduled shifts. At 8 a shift that was sent back once by
+    # its own verification ran out of turns before it could act on what it was told.
+    sh.add_argument("--max-iterations", type=int, default=20)
     sh.add_argument("--cleanup", action="store_true", help="remove the worktree afterwards")
     sh.add_argument("--max-paid-calls", type=int, default=6,
                     help="model calls allowed on a metered brain (Bedrock, API); the local model is free")

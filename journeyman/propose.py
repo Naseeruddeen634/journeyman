@@ -79,8 +79,8 @@ def body(record: dict, stat: str) -> str:
         out.append(f"- New review findings introduced: {', '.join(record['findings_introduced'])}")
     spec = record.get("spec_check") or ""
     if spec.startswith("passed"):
-        out.append(f"- Independent check {spec}: written from the task and the pre-change "
-                   "docstrings by agents that never saw this change.")
+        out.append(f"- Independent check {spec} (written from the task and the pre-change "
+                   "docstrings by agents that never saw this change).")
     elif spec and not spec.startswith("not run"):
         out.append(f"- Independent check: {spec}")
     if record.get("feedback_rounds"):

@@ -197,7 +197,42 @@ A shift takes the top item and:
    target finding no longer fires, and what it *said* it changed matches the diff
 6. commits to the branch only if all of that holds, and writes the report
 
-<!--SHIFT_EXAMPLE-->
+The same bug, two brains, both captured in `docs/submission/captured/`. The demo repository is
+`examples/helpdesk-ai`: `fit()` must trim a conversation to a word budget, and its docstring says the
+system message is always kept and the oldest messages go first. The only test checks that the newest
+message survives.
+
+On the local model, the agent was sent back twice by its own verification. The version it finally
+left passed the repository's test, and the independent checker showed it now dropped the system
+message. It was not committed:
+
+```
+  STUCK   failed: test_the_newest_message_survives_trimming
+  brain     qwen3-coder:30b
+  tests     1 red before, 0 red after
+  feedback  sent back 2 time(s) after claiming done
+  checked   An independent test written from the docstring and the task passed before the
+            change and fails after it: test_system_message_always_kept: AssertionError:
+            assert 'user' == 'system'
+  what it says:
+    Made the tests pass, but broke behaviour the documentation describes
+```
+
+On Claude in Amazon Bedrock it was sent back once, and the change it then left passed every check:
+
+```
+  FIXED   failed: test_the_newest_message_survives_trimming
+  brain     global.anthropic.claude-sonnet-4-6 (JOURNEYMAN_PREFER=bedrock)
+  commit    468a708
+  tests     1 red before, 0 red after
+  took      0.8 min
+  feedback  sent back 1 time(s) after claiming done
+  checked   passed: 10 independent test(s)
+  budget    11/40 turns, 4/120 commands, 11/40 paid calls
+```
+
+(Lines trimmed for width; nothing else changed. `--spec-check` was on for both.)
+
 
 ### It proposes, you dispose
 
@@ -235,7 +270,37 @@ said otherwise. That is in the table of lessons below.
 
 ### Turning a branch into a pull request
 
-<!--PROPOSE_EXAMPLE-->
+```
+$ journeyman propose
+  journeyman/20260914-2028-failed--test-the-newest-message-survives -> main
+  Description: .journeyman/proposals/journeyman-20260914-2028-...md
+
+  Journeyman does not push or open pull requests.
+  This repository has no remote, so there is nothing to push to. The branch is local: review it
+  with  git diff main...journeyman/20260914-2028-...  and merge it yourself if you want it.
+```
+
+The description it wrote for the Bedrock fix above, opening section:
+
+```markdown
+## Why this is believed to be right
+
+- Test suite: 1 failing before, 0 failing after.
+- Now passing: `tests/test_context.py::test_the_newest_message_survives_trimming`
+- Newly failing: none
+- Independent check passed: 10 independent test(s) (written from the task and the pre-change
+  docstrings by agents that never saw this change).
+- Claimed done 1 time(s) before it actually was; each time it was sent back with what was still wrong.
+
+## What was not checked
+
+- Only the repository's own test suite, Journeyman's static review checks and the independent
+  spec check were run.
+- Behaviour those tests do not cover is unverified. A green suite is necessary, not sufficient.
+```
+
+With a remote, it prints the `git push` command for you to run instead, and `gh pr create` too if
+`gh` is installed.
 
 The description is built from the shift record: tests before and after, the review
 verdict, how many times it claimed done before it was, the model and turns used, its
