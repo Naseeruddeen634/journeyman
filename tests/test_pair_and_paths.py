@@ -107,6 +107,24 @@ def test_pair_says_when_it_recovers(project):
     assert any(m.startswith("green again") for m in msgs)
 
 
+def test_a_save_that_stops_the_tests_running_is_red_not_silent(project):
+    state = pair.PairState(project)
+    state.prime()
+    assert state.on_save([project / "lib" / "money.py"]) == []
+    (project / "conftest.py").write_text("import does_not_exist\n")
+    msgs = state.on_save([project / "conftest.py"])
+    assert len(msgs) == 1 and msgs[0].startswith("RED after saving conftest.py: the tests no longer run")
+    assert "ModuleNotFoundError" in msgs[0] or "ImportError" in msgs[0]
+    (project / "conftest.py").write_text("")
+    assert state.on_save([project / "conftest.py"]) == ["the tests run again"]
+
+
+def test_saving_a_conftest_runs_the_tests_beneath_it(project):
+    (project / "tests" / "conftest.py").write_text("")
+    names = sorted(t.name for t in pair.affected_tests(project, "tests/conftest.py"))
+    assert names == ["test_invoice.py", "test_unrelated.py"]
+
+
 def test_pair_mentions_a_new_review_finding_in_the_file_you_saved(project):
     state = pair.PairState(project)
     state.prime()

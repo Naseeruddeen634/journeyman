@@ -77,16 +77,18 @@ def affected_tests(repo: str, file: str) -> list[str]:
 @server.tool(annotations=READ_ONLY)
 def run_affected_tests(repo: str, file: str) -> dict:
     """Run only the tests affected by `file` and report which passed and failed.
-    Does not modify anything; bytecode caches are bypassed so results reflect the
-    code on disk."""
+    `ran` is false when pytest could not run them at all (for example a conftest.py
+    that does not import), which is not the same as nothing failing. Does not modify
+    anything; bytecode caches are bypassed so results reflect the code on disk."""
+    from .pair import DID_NOT_RUN, run_tests
     from .pair import affected_tests as find
-    from .pair import run_tests
 
     root = _repo(repo)
     tests = find(root, file)
     passed, failed, tail = run_tests(root, tests)
-    return {"tests": [str(t.relative_to(root)) for t in tests],
-            "passed": sorted(passed), "failed": sorted(failed),
+    ran = not tests or DID_NOT_RUN not in failed
+    return {"tests": [str(t.relative_to(root)) for t in tests], "ran": ran,
+            "passed": sorted(passed - {DID_NOT_RUN}), "failed": sorted(failed - {DID_NOT_RUN}),
             "output_tail": tail if failed else ""}
 
 

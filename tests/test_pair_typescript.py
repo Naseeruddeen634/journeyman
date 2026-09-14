@@ -100,7 +100,7 @@ def fake_runner(report):
 def test_report_is_parsed_into_node_ids(project, monkeypatch):
     monkeypatch.setattr(pair.subprocess, "run", fake_runner(REPORT))
     passed, failed, first = run_js_tests(project, [project / "tests/invoice.test.ts"], "vitest")
-    assert passed == {"tests/invoice.test.ts::invoice zero"}
+    assert passed == {"tests/invoice.test.ts::invoice zero", pair.DID_NOT_RUN}
     assert failed == {"tests/invoice.test.ts::invoice adds vat",
                       "tests/broken.test.ts::(suite failed to load)"}
     assert first == "AssertionError: expected 132 to be 123"
@@ -109,7 +109,7 @@ def test_report_is_parsed_into_node_ids(project, monkeypatch):
 def test_a_runner_that_produces_no_report_is_red_not_silent(project, monkeypatch):
     monkeypatch.setattr(pair.subprocess, "run", fake_runner(None))
     passed, failed, first = run_js_tests(project, [project / "tests/invoice.test.ts"], "vitest")
-    assert not passed and failed == {"(vitest did not produce a report)"}
+    assert not passed and failed == {pair.DID_NOT_RUN}
     assert "Cannot find module" in first
 
 
@@ -140,7 +140,7 @@ def test_real_vitest_red_and_green(tmp_path):
           'describe("invoice", () => { it("adds vat", () => { expect(total(100)).toBe(123); }); });\n')
     state = PairState(root)
     state.prime()
-    assert state.status == {"tests/invoice.test.ts::invoice adds vat": "pass"}
+    assert state.status == {"tests/invoice.test.ts::invoice adds vat": "pass", pair.DID_NOT_RUN: "pass"}
 
     write(root, "src/money.ts", "export function vat(n: number): number {\n  return n * 1.5;\n}\n")
     msgs = state.on_save([root / "src/money.ts"])

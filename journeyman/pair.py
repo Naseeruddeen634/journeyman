@@ -30,6 +30,11 @@ from pathlib import Path
 from .autonomy.scout import _interpreter, fresh_env, skipped
 
 FAIL_PREFIXES = ("FAILED ", "ERROR ")
+# A save that breaks conftest.py stops pytest before any test runs, so nothing is
+# listed as failed and pair mode used to stay silent. This node stands for "the
+# tests could not run": red when they cannot, and passing on every run that works,
+# so recovering from it is announced like any other test going green.
+DID_NOT_RUN = "(tests did not run)"
 
 
 def _py_files(repo: Path) -> list[Path]:
@@ -99,8 +104,12 @@ def affected_tests(repo: str | Path, changed: str | Path,
     changed = (repo / changed).resolve() if not Path(changed).is_absolute() else Path(changed).resolve()
     graph = graph if graph is not None else import_graph(repo)
 
-    if is_test(changed, repo):
+    if is_test(changed, repo) and changed.name != "conftest.py":
         return [changed]
+    if changed.name == "conftest.py":
+        # pytest loads it for every test beneath it, and nothing imports it
+        return sorted(f for f in graph if is_test(f, repo) and f.name != "conftest.py"
+                      and changed.parent in f.parents)
 
     reverse: dict[Path, set[Path]] = defaultdict(set)
     for f, deps in graph.items():
@@ -139,8 +148,8 @@ def run_tests(repo: Path, tests: list[Path], timeout: int = 120) -> tuple[set[st
     try:
         r = subprocess.run(args, cwd=repo, capture_output=True, text=True, timeout=timeout,
                            env=fresh_env())
-    except subprocess.TimeoutExpired:
-        return set(), set(), "tests timed out"
+    except (subprocess.TimeoutExpired, OSError) as exc:
+        return set(), {DID_NOT_RUN}, f"tests did not finish: {exc}"
     out = r.stdout + r.stderr
     passed, failed = set(), set()
     for line in out.splitlines():
@@ -148,6 +157,12 @@ def run_tests(repo: Path, tests: list[Path], timeout: int = 120) -> tuple[set[st
             passed.add(line.split()[1])
         elif line.startswith(FAIL_PREFIXES):
             failed.add(line.split()[1])
+    # pytest exit 3/4: internal or usage error, e.g. a conftest.py that does not import
+    if r.returncode in (3, 4) or (r.returncode not in (0, 5) and not passed and not failed):
+        failed.add(DID_NOT_RUN)
+        errors = [l for l in out.splitlines() if "Error" in l]
+        return passed, failed, (errors[-1] if errors else out[-200:]).strip()
+    passed.add(DID_NOT_RUN)
     return passed, failed, out[-1200:]
 
 
@@ -197,8 +212,12 @@ class PairState:
             if broke:
                 first = next((l for l in out.splitlines() if "assert" in l.lower()
                               or "Error" in l), "") if "\n" in out else out
-                messages.append(f"RED after saving {names}: {', '.join(broke[:3])}"
+                what = "the tests no longer run" if DID_NOT_RUN in broke else ", ".join(broke[:3])
+                messages.append(f"RED after saving {names}: {what}"
                                 + (f"\n      {first.strip()[:110]}" if first else ""))
+            if DID_NOT_RUN in healed:
+                messages.append("the tests run again")
+                healed.remove(DID_NOT_RUN)
             if healed:
                 messages.append(f"green again: {', '.join(healed[:3])}")
 
@@ -345,12 +364,12 @@ def run_js_tests(repo: Path, tests: list[Path], runner: str,
             r = subprocess.run(argv, cwd=repo, capture_output=True, text=True, timeout=timeout,
                                env={**fresh_env(), "CI": "1", "FORCE_COLOR": "0"})
         except (subprocess.TimeoutExpired, OSError) as exc:
-            return set(), set(), f"{runner} did not run: {exc}"
+            return set(), {DID_NOT_RUN}, f"{runner} did not run: {exc}"
         try:
             data = json.loads(report.read_text(encoding="utf8"))
         except (OSError, json.JSONDecodeError):
             tail = (r.stderr or r.stdout).strip().splitlines()
-            return set(), {f"({runner} did not produce a report)"}, tail[-1][:160] if tail else ""
+            return set(), {DID_NOT_RUN}, tail[-1][:160] if tail else f"{runner} did not produce a report"
     passed, failed, first = set(), set(), ""
     for suite in data.get("testResults", []):
         try:
@@ -369,6 +388,7 @@ def run_js_tests(repo: Path, tests: list[Path], runner: str,
             failed.add(f"{rel}::(suite failed to load)")
             lines = (suite.get("message") or "").strip().splitlines()
             first = first or (lines[0][:160] if lines else "")
+    passed.add(DID_NOT_RUN)
     return passed, failed, first
 
 
@@ -388,8 +408,11 @@ def watch(repo: str | Path, interval: float = 1.0, settle: float = 0.6, notify=N
     state = PairState(repo)
     out(f"  pairing on {repo}  (learning the current state...)")
     state.prime()
-    red = sum(1 for v in state.status.values() if v == "fail")
-    out(f"  ready: {len(state.status)} tests, {red} already red. Quiet unless that changes.")
+    real = {k: v for k, v in state.status.items() if k != DID_NOT_RUN}
+    red = sum(1 for v in real.values() if v == "fail")
+    out(f"  ready: {len(real)} tests, {red} already red"
+        + (", and the tests do not currently run" if state.status.get(DID_NOT_RUN) == "fail" else "")
+        + ". Quiet unless that changes.")
 
     last = snapshot(repo)
     while True:
