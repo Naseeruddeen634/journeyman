@@ -321,3 +321,105 @@ def test_an_fstring_inside_another_string_is_not_interpolation(tmp_path):
         "FIXTURE = 'prompt = f\"You are a bot: {user_query}\"'\n"
         "SYSTEM = 'You are a helper.'\n")
     assert not any(f.code == "AIE004" for f in review(tmp_path))
+
+
+# ---- the agent that was registered and never ran ----------------------
+
+
+def test_program_args_keep_a_path_with_spaces_whole(tmp_path, monkeypatch):
+    """The installer split the binary path on spaces. With the project in
+    '~/Downloads/untitled folder', launchd was told to run '/Users/.../untitled'.
+    It stayed registered, `launchctl list` showed it, and it ran zero times."""
+    import journeyman.service as svc
+
+    spaced = tmp_path / "untitled folder" / "venv" / "bin"
+    spaced.mkdir(parents=True)
+    (spaced / "journeyman").write_text("#!/bin/sh\n")
+    monkeypatch.setattr(svc.sys, "executable", str(spaced / "python"))
+    args = svc.program_args(["/repo with space"], max_shifts=1)
+    assert args[0] == str(spaced / "journeyman")
+    assert args[args.index("--repo") + 1].endswith("repo with space")
+
+
+def test_write_plist_refuses_a_program_that_does_not_exist(tmp_path, monkeypatch):
+    import journeyman.service as svc
+
+    with pytest.raises(FileNotFoundError):
+        svc.write_plist(["/r"], path=tmp_path / "x.plist", script=tmp_path / "nope" / "journeyman")
+
+
+def test_protected_folders_are_detected():
+    import journeyman.service as svc
+
+    home = Path.home()
+    got = svc.protected_paths([str(home / "Downloads" / "a"), str(home / "Documents"),
+                               str(home / ".journeyman" / "app"), str(home / "code" / "x"), "/tmp/y"])
+    assert got == [str((home / "Downloads" / "a").resolve()), str((home / "Documents").resolve())]
+
+
+def _fake_verify(monkeypatch, tmp_path, states, out="", err=""):
+    import journeyman.service as svc
+
+    logs = tmp_path / "logs"
+    logs.mkdir(exist_ok=True)
+    monkeypatch.setattr(svc, "LOGS", logs)
+    monkeypatch.setattr(svc, "PLIST", tmp_path / "agent.plist")
+    script = tmp_path / "bin" / "journeyman"
+    script.parent.mkdir(exist_ok=True)
+    script.write_text("#!/bin/sh\n")
+    (logs / "agent.verify.err.log").write_text("Operation not permitted (stale, from an earlier run)")
+    seq = iter(states)
+
+    def fake_run(argv, **kw):
+        if argv[:2] == ["launchctl", "load"]:
+            (logs / "agent.verify.out.log").write_text(out)
+            if err:
+                (logs / "agent.verify.err.log").write_text(err)
+        return type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+
+    monkeypatch.setattr(svc.subprocess, "run", fake_run)
+    last = {}
+
+    def fake_state(label=svc.LABEL):
+        nonlocal last
+        last = next(seq, last)
+        return last
+
+    monkeypatch.setattr(svc, "launchd_state", fake_state)
+    monkeypatch.setattr("time.sleep", lambda s: None)
+    return svc.verify(["/r"], timeout=5, script=script)
+
+
+def test_verify_waits_past_launchd_spawn_states(monkeypatch, tmp_path):
+    """An earlier version read the exit code while launchd was still in xpcproxy."""
+    ok, detail = _fake_verify(monkeypatch, tmp_path, [
+        {"loaded": True, "state": "xpcproxy", "runs": 1, "last_exit": "(never exited)"},
+        {"loaded": True, "state": "running", "runs": 1, "last_exit": "(never exited)"},
+        {"loaded": True, "state": "not running", "runs": 1, "last_exit": "0"},
+    ], out="PREFLIGHT OK: can start, 1 repo(s), brain available\n")
+    assert ok, detail
+
+
+def test_verify_ignores_a_stale_error_log_from_a_previous_attempt(monkeypatch, tmp_path):
+    ok, detail = _fake_verify(monkeypatch, tmp_path, [
+        {"loaded": True, "state": "not running", "runs": 1, "last_exit": "0"},
+    ], out="PREFLIGHT OK\n")
+    assert ok, f"misdiagnosed from a stale stderr log: {detail}"
+
+
+def test_verify_explains_macos_privacy_denial(monkeypatch, tmp_path):
+    ok, detail = _fake_verify(monkeypatch, tmp_path, [
+        {"loaded": True, "state": "not running", "runs": 1, "last_exit": "126"},
+    ], err="/bin/sh: /Users/x/Downloads/app/journeyman: Operation not permitted\n")
+    assert not ok
+    assert "Full Disk Access" in detail and "~/code" in detail
+
+
+def test_status_calls_a_job_that_cannot_run_broken(monkeypatch):
+    import journeyman.service as svc
+
+    monkeypatch.setattr(svc, "launchd_state", lambda label=svc.LABEL: {
+        "loaded": True, "runs": 0, "last_exit": "(never exited)",
+        "program": "/Users/x/Downloads/untitled", "program_exists": False})
+    st = svc.status()
+    assert st["loaded"] and st["runs"] == 0 and not st["program_exists"]

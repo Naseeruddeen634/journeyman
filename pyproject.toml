@@ -6,7 +6,14 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "Naseeruddeen Shahul Hameed" }]
-dependencies = ["strands-agents>=1.55.0", "strands-agents-tools>=0.8.0"]
+dependencies = [
+  "strands-agents[ollama,openai]>=1.55.0",
+  "strands-agents-tools>=0.8.0",
+  "boto3>=1.34",
+  "pydantic>=2.0",
+  # the agent runs a repo's tests with this interpreter when the repo has no venv
+  "pytest>=8.0",
+]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]

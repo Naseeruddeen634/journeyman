@@ -93,15 +93,11 @@ def program_args(repos: list[str], max_shifts: int = 2, dry_run: bool = False,
     '/Users/.../untitled'. launchd registered the job, `launchctl list` showed
     it, and it never ran once: runs = 0, program does not exist.
     """
-    if script is not None:
-        # Explicit means explicit. Falling back to the current interpreter would
-        # silently point launchd back at an install it may not be allowed to read.
-        args = [str(script)]
-    else:
+    if script is None:
         script = Path(sys.executable).parent / "journeyman"
         if not script.exists() and (app_python().parent / "journeyman").exists():
             script = app_python().parent / "journeyman"
-        args = [str(script)] if script.exists() else [sys.executable, "-m", "journeyman.cli"]
+    args = [str(script)] if script.exists() else [sys.executable, "-m", "journeyman.cli"]
     args += ["run-scheduled", "--max-shifts", str(max_shifts)]
     for r in repos:
         args += ["--repo", str(Path(r).resolve())]
@@ -196,10 +192,7 @@ def verify(repos: list[str], timeout: float = 60.0, script: Path | None = None) 
     label = f"{LABEL}.verify"
     path = PLIST.parent / f"{label}.plist"
     log = LOGS / "agent.verify.out.log"
-    # Clear both logs. Clearing only stdout let a previous attempt's
-    # "Operation not permitted" in stderr misdiagnose a job that was fine.
     log.unlink(missing_ok=True)
-    (LOGS / "agent.verify.err.log").unlink(missing_ok=True)
     try:
         write_plist(repos, label=label, path=path, dry_run=True, run_at_load=True,
                     every_minutes=24 * 60, script=script)
