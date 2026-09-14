@@ -536,6 +536,19 @@ def work_one(repo: str | Path, task: Task | None = None, budget: Budget | None =
         hooks=[guard],
     )
 
+    # The budget hook runs between model calls, so it cannot stop a single
+    # generation that runs away. Agent.cancel() is thread-safe and takes effect
+    # during streaming, so a timer enforces the wall clock from outside.
+    import threading
+
+    def _overtime() -> None:
+        if not guard.stopped_by:
+            guard.stopped_by = f"{budget.max_minutes:g} minute limit reached during a model call"
+        agent.cancel()
+
+    watchdog = threading.Timer(budget.max_minutes * 60, _overtime)
+    watchdog.daemon = True
+    watchdog.start()
     try:
         prompt = brief
         for round_no in range(max_feedback_rounds + 1):
@@ -555,6 +568,8 @@ def work_one(repo: str | Path, task: Task | None = None, budget: Budget | None =
     except Exception as exc:
         result.outcome = "error"
         result.summary = f"{type(exc).__name__}: {exc}"
+    finally:
+        watchdog.cancel()
 
     result.stopped_by = guard.stopped_by
 

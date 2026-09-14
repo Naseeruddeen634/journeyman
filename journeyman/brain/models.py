@@ -29,6 +29,17 @@ from dataclasses import dataclass
 
 LOCAL_MODEL = os.environ.get("JOURNEYMAN_LOCAL_MODEL", "qwen3-coder:30b")
 BEDROCK_MODEL = os.environ.get("JOURNEYMAN_BEDROCK_MODEL", "global.anthropic.claude-sonnet-4-6")
+
+# Ollama's default context window is 4096 tokens, and nothing here used to change
+# it. Ollama's own log on the development machine showed prompts with a median of
+# 1,817 tokens and a p90 of 2,832, and eight 'slot context shift' events with
+# n_keep = 4 and n_discard = 2045: when the window filled mid-generation it kept
+# the first four tokens and threw away the system prompt and the task. 16K costs
+# roughly 1.2 GB more KV cache on Qwen3-Coder-30B-A3B.
+LOCAL_CTX = int(os.environ.get("JOURNEYMAN_LOCAL_CTX", "16384"))
+# Bounded output. Journeyman's reviewer flags an unbounded model call as AIE002;
+# its own brains were exactly that.
+MAX_OUTPUT_TOKENS = int(os.environ.get("JOURNEYMAN_MAX_OUTPUT_TOKENS", "4096"))
 BEDROCK_REGION = os.environ.get("AWS_REGION", "us-west-2")
 HEAVY_MODEL = os.environ.get("JOURNEYMAN_HEAVY_MODEL", "moonshotai/kimi-k3")
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
@@ -62,6 +73,9 @@ def local_brain(temperature: float = 0.2, **kw):
         host=OLLAMA_HOST,
         model_id=LOCAL_MODEL,
         temperature=temperature,
+        max_tokens=MAX_OUTPUT_TOKENS,
+        options={"num_ctx": LOCAL_CTX, **kw.pop("options", {})},
+        keep_alive="30m",   # a shift is many calls; do not reload 18 GB between them
         **kw,
     )
 
@@ -77,9 +91,10 @@ def heavy_brain(temperature: float = 0.3, **kw):
             f"The agent will keep working on {LOCAL_MODEL} alone."
         )
     return OpenAIModel(
-        client_args={"api_key": key, "base_url": HEAVY_BASE_URL},
+        client_args={"api_key": key, "base_url": HEAVY_BASE_URL, "timeout": 120.0,
+                     "max_retries": 3},
         model_id=HEAVY_MODEL,
-        params={"temperature": temperature},
+        params={"temperature": temperature, "max_tokens": MAX_OUTPUT_TOKENS},
         **kw,
     )
 
@@ -98,6 +113,7 @@ def bedrock_brain(temperature: float = 0.2, **kw):
         model_id=BEDROCK_MODEL,
         region_name=BEDROCK_REGION,
         temperature=temperature,
+        max_tokens=MAX_OUTPUT_TOKENS,
         **kw,
     )
 

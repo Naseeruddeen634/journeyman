@@ -98,3 +98,65 @@ def test_a_stopped_agent_ends_cleanly_rather_than_raising():
     """The shift's own verification has to run after a budget stop."""
     model, guard, out = _run(Budget(max_iterations=2))
     assert isinstance(out, str) and guard.stopped_by
+
+
+class StreamsForever(Model):
+    """A single generation that never finishes. The between-calls hook cannot see it."""
+
+    def __init__(self):
+        self.cfg = {}
+
+    def update_config(self, **kw):
+        self.cfg.update(kw)
+
+    def get_config(self):
+        return self.cfg
+
+    async def structured_output(self, *a, **k):
+        yield {}
+
+    async def stream(self, messages, tool_specs=None, system_prompt=None, **kw):
+        import asyncio
+
+        yield {"messageStart": {"role": "assistant"}}
+        yield {"contentBlockStart": {"start": {}}}
+        while True:
+            yield {"contentBlockDelta": {"delta": {"text": "and again "}}}
+            await asyncio.sleep(0.01)
+
+
+def test_the_watchdog_interrupts_a_generation_in_progress():
+    """What work_one does: a timer calls Agent.cancel() from another thread."""
+    import threading
+    import time
+
+    agent = Agent(model=StreamsForever(), callback_handler=None)
+    timer = threading.Timer(0.5, agent.cancel)
+    timer.start()
+    started = time.monotonic()
+    try:
+        agent("go")
+    except Exception:
+        pass            # cancelled is the outcome; how it surfaces is the SDK's business
+    finally:
+        timer.cancel()
+    assert time.monotonic() - started < 10, "a runaway generation must be interruptible"
+
+
+def test_the_local_brain_sets_a_real_context_window_and_bounded_output(monkeypatch):
+    """Ollama defaults to 4096 tokens and, when full, kept 4 tokens and discarded
+    2045: the system prompt and the task. Measured in Ollama's own log."""
+    import importlib
+
+    import journeyman.brain.models as models
+    importlib.reload(models)
+    m = models.local_brain()
+    assert m.config["options"]["num_ctx"] >= 16384
+    assert 0 < m.config["max_tokens"] <= 8192
+    assert m.config["keep_alive"]
+
+    monkeypatch.setenv("JOURNEYMAN_LOCAL_CTX", "32768")
+    importlib.reload(models)
+    assert models.local_brain().config["options"]["num_ctx"] == 32768
+    monkeypatch.delenv("JOURNEYMAN_LOCAL_CTX")
+    importlib.reload(models)
