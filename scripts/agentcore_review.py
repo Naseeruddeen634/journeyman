@@ -34,7 +34,7 @@ def main() -> int:
     repo = Path(a.repo).expanduser().resolve()
     payload = {"archive": pack(repo), "name": repo.name, "mode": a.mode, "prompt": a.prompt}
     # An explanation is a multi-turn model call on the service side; boto3's default 60 s read
-    # timeout cut it off. Adaptive retry because throttling is the normal case (AIE010, which
+    # timeout would cut it off. Adaptive retry because throttling is the normal case (AIE010, which
     # Journeyman's own review raised on the first version of this script).
     client = boto3.client("bedrock-agentcore", region_name=a.region,
                           config=Config(read_timeout=300, retries={"mode": "adaptive", "max_attempts": 4}))
