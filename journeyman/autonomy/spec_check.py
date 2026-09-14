@@ -248,7 +248,7 @@ def extract_code(text: str) -> str | None:
     return None
 
 
-def _pytest(tree: Path, code: str, timeout: int = 120) -> SpecRun:
+def _pytest(tree: Path, code: str, timeout: int = 120, python: str | None = None) -> SpecRun:
     from . import jail
     from .scout import _interpreter, fresh_env
 
@@ -257,7 +257,7 @@ def _pytest(tree: Path, code: str, timeout: int = 120) -> SpecRun:
     env = fresh_env({"COLUMNS": "400"})      # pytest truncates the failure summary to the terminal width
     if (tree / "src").is_dir():
         env["PYTHONPATH"] = str(tree / "src") + (":" + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
-    argv, env, _ = jail.wrap([_interpreter(tree), "-m", "pytest", "-q", "-rA", "--no-header",
+    argv, env, _ = jail.wrap([python or _interpreter(tree), "-m", "pytest", "-q", "-rA", "--no-header",
                               "--tb=line", "-p", "no:cacheprovider", SPEC_FILE], tree, env)
     run = SpecRun()
     try:
@@ -290,7 +290,14 @@ def run_against_change(root: Path, code: str) -> SpecRun:
 
 
 def run_against_head(root: Path, code: str) -> SpecRun:
-    """The same tests on the code as it was before the change."""
+    """The same tests on the code as it was before the change.
+
+    HEAD is exported to a temporary directory, which has no .venv, so it runs with
+    the interpreter the change was tested with rather than whatever that directory
+    would resolve to."""
+    from .scout import _interpreter
+
+    python = _interpreter(Path(root))
     with tempfile.TemporaryDirectory(prefix="journeyman-head-") as tmp:
         archive = Path(tmp) / "head.tar"
         made = subprocess.run(["git", "archive", "--format=tar", "-o", str(archive), "HEAD"],
@@ -301,7 +308,7 @@ def run_against_head(root: Path, code: str) -> SpecRun:
         tree.mkdir()
         with tarfile.open(archive) as tar:
             tar.extractall(tree, filter="data")
-        return _pytest(tree, code)
+        return _pytest(tree, code, python=python)
 
 
 @dataclass
