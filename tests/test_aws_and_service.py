@@ -278,3 +278,46 @@ def test_it_is_clean_against_its_own_source():
     repo = Path(__file__).resolve().parents[1]
     findings = [f for f in review(repo) if f.severity >= 60]
     assert findings == [], [f"{f.code} {f.where}" for f in findings]
+
+
+def test_a_prompt_module_with_no_sdk_import_is_still_reviewed(tmp_path):
+    """Prompt builders usually live apart from the client. Gating on an SDK
+    import meant the riskiest file in the repo was never looked at."""
+    (tmp_path / "prompts.py").write_text(
+        'def build_prompt(ticket_text):\n'
+        '    prompt = f"You are a support agent. Reply to: {ticket_text}"\n'
+        '    return prompt\n')
+    assert any(f.code == "AIE004" for f in review(tmp_path))
+
+
+def test_a_terminal_prompt_is_not_mistaken_for_an_llm_prompt(tmp_path):
+    (tmp_path / "cli.py").write_text(
+        'def ask(message):\n'
+        '    prompt = f"Enter a value for {message}: "\n'
+        '    return input(prompt)\n')
+    assert review(tmp_path) == []
+
+
+def test_journeymanignore_excludes_fixture_directories(tmp_path):
+    bad = 'from openai import OpenAI\ndef b(user_query):\n    prompt = f"You are a bot: {user_query}"\n'
+    (tmp_path / "fixtures").mkdir()
+    (tmp_path / "fixtures" / "bad.py").write_text(bad)
+    assert review(tmp_path), "without an ignore file the fixture is reviewed"
+    (tmp_path / ".journeymanignore").write_text("# broken on purpose\nfixtures/\n")
+    assert review(tmp_path) == []
+
+
+def test_a_model_id_in_a_test_is_not_a_production_risk(tmp_path):
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "test_m.py").write_text(
+        'from openai import OpenAI\n'
+        'def test_default():\n'
+        '    assert pick() == "gpt-4o-mini"\n')
+    assert not any(f.code == "AIE001" for f in review(tmp_path))
+
+
+def test_an_fstring_inside_another_string_is_not_interpolation(tmp_path):
+    (tmp_path / "t.py").write_text(
+        "FIXTURE = 'prompt = f\"You are a bot: {user_query}\"'\n"
+        "SYSTEM = 'You are a helper.'\n")
+    assert not any(f.code == "AIE004" for f in review(tmp_path))

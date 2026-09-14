@@ -48,7 +48,10 @@ LLM_MARKERS = re.compile(
     r"\b(openai|anthropic|bedrock|ollama|litellm|langchain|llama_index|llamaindex|"
     r"strands|mistral|cohere|together|groq|huggingface|transformers|"
     r"chat\.completions|messages\.create|invoke_model|generate_content|"
-    r"ChatPromptTemplate|system_prompt|completion\(|bedrock-runtime|converse)",
+    r"ChatPromptTemplate|system_prompt|completion\(|bedrock-runtime|converse|"
+    # Prompt-building modules often never import an SDK: the client lives
+    # elsewhere. The opening line of nearly every LLM prompt is the tell.
+    r"[\"']You are (?:a|an|the) |[\"']role[\"']\s*:\s*[\"'](?:system|assistant)[\"'])",
     re.I,
 )
 
@@ -59,8 +62,54 @@ MODEL_ID = re.compile(
 )
 
 
+def ignore_patterns(repo: Path) -> list[str]:
+    """Patterns from .journeymanignore, gitignore-style but deliberately simple.
+
+    Every real repo has fixtures full of bad code on purpose: test data,
+    benchmark cases, examples in docs. Without a way to say so, those become the
+    top findings and the tool gets switched off.
+    """
+    f = repo / ".journeymanignore"
+    if not f.exists():
+        return []
+    out = []
+    for line in f.read_text(encoding="utf8").splitlines():
+        line = line.strip()
+        if line and not line.startswith("#"):
+            out.append(line)
+    return out
+
+
+def is_ignored(rel: str, patterns: list[str]) -> bool:
+    import fnmatch
+
+    rel = rel.replace("\\", "/")
+    for pat in patterns:
+        if pat.endswith("/"):
+            if rel.startswith(pat) or f"/{pat}" in f"/{rel}":
+                return True
+        elif fnmatch.fnmatch(rel, pat) or fnmatch.fnmatch(Path(rel).name, pat):
+            return True
+    return False
+
+
+def is_test_file(rel: str) -> bool:
+    parts = Path(rel).parts
+    name = Path(rel).name
+    return ("tests" in parts or "test" in parts or name.startswith("test_")
+            or name.endswith("_test.py") or name == "conftest.py")
+
+
 def _files(repo: Path) -> list[Path]:
-    return [p for p in repo.rglob("*.py") if not any(s in p.parts for s in SKIP)]
+    patterns = ignore_patterns(repo)
+    out = []
+    for p in repo.rglob("*.py"):
+        if any(s in p.parts for s in SKIP):
+            continue
+        if patterns and is_ignored(str(p.relative_to(repo)), patterns):
+            continue
+        out.append(p)
+    return out
 
 
 def _is_llm_file(text: str) -> bool:
@@ -72,6 +121,8 @@ def _is_llm_file(text: str) -> bool:
 
 def check_hardcoded_model_ids(path: Path, text: str, tree: ast.AST, rel: str) -> list[Finding]:
     """AIE001. A model id buried in code is a deprecation with a delay fuse."""
+    if is_test_file(rel):
+        return []   # a test pinning a model id is test data, not a production 404
     out = []
     seen = set()
     for i, line in enumerate(text.splitlines(), 1):
@@ -163,6 +214,35 @@ def check_unvalidated_parsing(path: Path, text: str, tree: ast.AST, rel: str) ->
     return out
 
 
+def interpolation_lines(text: str, tree: ast.AST) -> set[int]:
+    """Lines where a real f-string or a real .format() call actually occurs.
+
+    Matching the characters f" on a line also matches f" sitting inside some
+    other string, such as a test fixture that holds bad code as data. The
+    tokenizer knows the difference, so ask it.
+    """
+    import io as _io
+    import tokenize
+
+    lines: set[int] = set()
+    try:
+        for tok in tokenize.generate_tokens(_io.StringIO(text).readline):
+            name = tokenize.tok_name.get(tok.type, "")
+            if name == "FSTRING_START":
+                lines.add(tok.start[0])
+            elif tok.type == tokenize.STRING:
+                prefix = tok.string[: len(tok.string) - len(tok.string.lstrip("rRbBuUfF"))]
+                if "f" in prefix.lower():
+                    lines.add(tok.start[0])
+    except (tokenize.TokenError, IndentationError, SyntaxError):
+        pass
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) \
+                and node.func.attr == "format":
+            lines.add(node.lineno)
+    return lines
+
+
 def check_prompt_injection_surface(path: Path, text: str, tree: ast.AST, rel: str) -> list[Finding]:
     """AIE004. User text interpolated into a prompt with no boundary.
 
@@ -186,14 +266,15 @@ def check_prompt_injection_surface(path: Path, text: str, tree: ast.AST, rel: st
         r"(is data|as data|not instructions|never instructions|not an instruction|"
         r"do not follow|ignore any instructions|untrusted)", text, re.I)
 
+    real = interpolation_lines(text, tree)
     out = []
     for i, line in enumerate(text.splitlines(), 1):
         if line.lstrip().startswith("#"):
             continue      # a comment describing the pattern is not the pattern
         if not re.search(r"(prompt|system|instruction|template)", line, re.I):
             continue
-        if not re.search(r'f["\']|\.format\(', line):
-            continue
+        if i not in real:
+            continue      # no actual interpolation happens on this line
         if not placeholder.search(line):
             continue
 
@@ -314,8 +395,11 @@ def check_nondeterministic_tests(path: Path, text: str, tree: ast.AST, rel: str)
 def check_prompt_without_eval(repo: Path) -> list[Finding]:
     """AIE008. The one that matters most. A prompt nobody measures."""
     prompt_files: list[tuple[Path, str]] = []
+    patterns = ignore_patterns(repo)
     for p in repo.rglob("*"):
         if any(s in p.parts for s in SKIP) or not p.is_file():
+            continue
+        if patterns and is_ignored(str(p.relative_to(repo)), patterns):
             continue
         if p.suffix.lower() in {".txt", ".md", ".jinja", ".j2", ".prompt"} and \
                 re.search(r"prompt", str(p), re.I):
