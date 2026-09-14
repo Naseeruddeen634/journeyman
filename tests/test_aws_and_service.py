@@ -423,3 +423,24 @@ def test_status_calls_a_job_that_cannot_run_broken(monkeypatch):
         "program": "/Users/x/Downloads/untitled", "program_exists": False})
     st = svc.status()
     assert st["loaded"] and st["runs"] == 0 and not st["program_exists"]
+
+
+def test_a_stale_self_contained_copy_is_noticed(tmp_path, monkeypatch):
+    """The scheduled app is a copy. Editing the source must not leave it
+    silently running old code."""
+    import json
+
+    import journeyman.service as svc
+
+    src = tmp_path / "src"
+    (src / "journeyman").mkdir(parents=True)
+    (src / "journeyman" / "a.py").write_text("X = 1\n")
+    app = tmp_path / "app"
+    app.mkdir()
+    monkeypatch.setattr(svc, "APP", app)
+    (app / "BUILD.json").write_text(json.dumps(
+        {"source": str(src), "fingerprint": svc.source_fingerprint(src), "built": "now"}))
+
+    assert svc.app_freshness()["stale"] is False
+    (src / "journeyman" / "a.py").write_text("X = 2\n")
+    assert svc.app_freshness()["stale"] is True

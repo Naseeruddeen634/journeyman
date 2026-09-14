@@ -253,6 +253,13 @@ def _status(args) -> int:
         elif st["loaded"] and st["runs"] == 0:
             print("  note       registered but has not run yet. That is expected only "
                   "within one interval of installing.")
+    app = st.get("app") or {}
+    if app.get("installed"):
+        if app.get("stale"):
+            print(f"  STALE      the scheduled copy was built {app['built']} and the source has "
+                  "changed since. Rebuild:  journeyman install --self-contained --repo ...")
+        elif app.get("stale") is False:
+            print(f"  app        up to date with {app['source']} (built {app['built']})")
     print(f"  home       {st['home']}")
     for r in st["repos"]:
         print(f"  watching   {r}")

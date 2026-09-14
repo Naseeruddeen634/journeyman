@@ -80,7 +80,49 @@ def build_app(source: Path, log=print) -> Path:
     script = app_python().parent / "journeyman"
     if not script.exists():
         raise RuntimeError(f"installed, but {script} was not created")
+    import json as _json
+    import time as _time
+    (APP / "BUILD.json").write_text(_json.dumps({
+        "source": str(Path(source).resolve()),
+        "fingerprint": source_fingerprint(Path(source)),
+        "built": _time.strftime("%Y-%m-%d %H:%M"),
+    }, indent=2), encoding="utf8")
     return script
+
+
+def source_fingerprint(source: Path) -> str:
+    """A hash of the package source, so a stale copy can be noticed.
+
+    The self-contained app is a copy. Without this, editing the source leaves
+    the scheduled agent running yesterday's code with nothing to say so.
+    """
+    import hashlib
+
+    h = hashlib.sha256()
+    pkg = Path(source).resolve() / "journeyman"
+    for f in sorted(pkg.rglob("*.py")):
+        if "__pycache__" in f.parts:
+            continue
+        h.update(str(f.relative_to(pkg)).encode())
+        h.update(f.read_bytes())
+    return h.hexdigest()[:16]
+
+
+def app_freshness() -> dict:
+    """Is the installed copy the same code as its source right now?"""
+    import json as _json
+
+    build = APP / "BUILD.json"
+    if not build.exists():
+        return {"installed": False}
+    info = _json.loads(build.read_text(encoding="utf8"))
+    src = Path(info.get("source", ""))
+    if not (src / "journeyman").exists():
+        return {"installed": True, "stale": None, "built": info.get("built"),
+                "reason": f"source {src} is not reachable from here"}
+    current = source_fingerprint(src)
+    return {"installed": True, "stale": current != info.get("fingerprint"),
+            "built": info.get("built"), "source": str(src)}
 
 
 def program_args(repos: list[str], max_shifts: int = 2, dry_run: bool = False,
@@ -269,4 +311,5 @@ def status() -> dict:
         "home": str(HOME),
         "repos": cfg.get("repos", []),
         "log": str(LOGS / "agent.out.log"),
+        "app": app_freshness(),
     }
