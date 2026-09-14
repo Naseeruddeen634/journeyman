@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from journeyman.remote import RequestError, extract, handle, parse_repo, read_tool
+from journeyman.remote import RequestError, extract, handle, pack, parse_repo, read_tool
 
 APP = textwrap.dedent('''
     from openai import OpenAI
@@ -76,3 +76,28 @@ def test_the_agent_can_only_read_inside_the_repository(tmp_path):
     assert read(path="app/x.py") == "1: a = 1\n2: b = 2"
     assert "not a file" in read(path="../secret.txt")
     assert "not a file" in read(path="/etc/passwd")
+
+
+def test_a_local_repository_can_be_sent_as_an_archive(tmp_path):
+    import subprocess
+
+    repo = tmp_path / "helpdesk-ai"
+    (repo / "app").mkdir(parents=True)
+    (repo / "app" / "triage.py").write_text(APP)
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "x"], cwd=repo, check=True)
+    (repo / "uncommitted.py").write_text("SECRET = 1\n")          # only HEAD is sent
+
+    out = handle({"archive": pack(repo), "name": "helpdesk-ai", "mode": "review"},
+                 fetcher=lambda r, d: pytest.fail("must not download"))
+    assert out["repo"] == "helpdesk-ai" and out["ref"] == "archive"
+    assert any(f["code"] == "AIE001" and f["where"].startswith("app/triage.py") for f in out["findings"])
+    assert not any("uncommitted" in f["where"] for f in out["findings"])
+
+
+def test_a_bad_archive_is_a_clear_error():
+    with pytest.raises(RequestError, match="base64"):
+        handle({"archive": "not base64!!", "mode": "review"})
+    with pytest.raises(RequestError, match="unpack"):
+        handle({"archive": "aGVsbG8=", "mode": "review"})

@@ -150,16 +150,51 @@ def explain(root: Path, result: dict, model=None, question: str = "") -> str:
     return str(agent(brief)).strip()
 
 
+def pack(repo_dir: Path) -> str:
+    """base64 tar.gz of a local git repository's HEAD, for sending in a request."""
+    import base64
+    import subprocess
+
+    top = Path(repo_dir).resolve().name
+    r = subprocess.run(["git", "archive", "--format=tar.gz", f"--prefix={top}/", "HEAD"],
+                       cwd=repo_dir, capture_output=True)
+    if r.returncode != 0:
+        raise RequestError(f"{repo_dir} is not a git repository with a commit: {r.stderr.decode()[:200]}")
+    return base64.b64encode(r.stdout).decode()
+
+
 def handle(payload: dict, model=None, fetcher=fetch) -> dict:
-    """One request: {"repo": url, "mode": "review" | "explain", "prompt": optional}."""
-    repo = parse_repo(payload.get("repo", ""))
+    """One request: {"repo": github url | "archive": base64 tar.gz, "mode": "review" | "explain",
+    "prompt": optional}.
+
+    An archive lets a private or unpushed repository be reviewed without giving the
+    service any access to where it lives: the caller sends exactly what it chooses to.
+    """
+    import base64
+    import binascii
+
     mode = payload.get("mode", "explain")
     if mode not in ("review", "explain"):
         raise RequestError('mode must be "review" (deterministic only) or "explain"')
+    archive = payload.get("archive")
+    if archive:
+        try:
+            data = base64.b64decode(archive, validate=True)
+        except (binascii.Error, ValueError) as exc:
+            raise RequestError("archive must be base64-encoded tar.gz") from exc
+        label, ref = str(payload.get("name") or "uploaded archive")[:100], "archive"
+        get = lambda dest: extract(data, dest)
+    else:
+        repo = parse_repo(payload.get("repo", ""))
+        label, ref = f"{repo.owner}/{repo.name}", repo.ref
+        get = lambda dest: fetcher(repo, dest)
     with tempfile.TemporaryDirectory(prefix="journeyman-remote-") as tmp:
-        root = fetcher(repo, Path(tmp))
+        try:
+            root = get(Path(tmp))
+        except (tarfile.TarError, OSError) as exc:
+            raise RequestError(f"could not unpack the repository: {exc}") from exc
         result = analyse(root)
-        out = {"repo": f"{repo.owner}/{repo.name}", "ref": repo.ref, **result}
+        out = {"repo": label, "ref": ref, **result}
         if mode == "explain":
             out["explanation"] = explain(root, result, model=model, question=payload.get("prompt", ""))
     return out
