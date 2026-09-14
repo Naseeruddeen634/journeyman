@@ -87,6 +87,43 @@ def _tools() -> list[Check]:
     return out
 
 
+def _confinement() -> Check:
+    """Can code a shift causes to run be kept inside the worktree?
+
+    A shift runs the repository's tests after the agent edits the code, so a test
+    file the agent wrote runs with your permissions unless an OS sandbox holds
+    it. This runs a real probe rather than trusting that sandbox-exec exists:
+    Apple deprecated it, and a sandbox that silently stopped enforcing would be
+    worse than none.
+    """
+    import tempfile
+
+    from .autonomy import jail
+
+    if not jail.available():
+        return Check("test confinement", "warn", "no OS sandbox on this platform",
+                     "Shifts still work, but tests the agent edits run unconfined. Review "
+                     "branches before running their code yourself, and prefer a disposable VM "
+                     "or container for scheduled runs.")
+    with tempfile.TemporaryDirectory() as work:
+        work_p = Path(work)
+        probe = Path.home() / ".journeyman" / "doctor-confinement-probe"
+        probe.unlink(missing_ok=True)
+        argv, env, _ = jail.wrap(["/bin/sh", "-c", f"echo x > '{probe}'; echo ok > inside"],
+                                 work_p, None)
+        subprocess.run(argv, cwd=work_p, capture_output=True, text=True, env=env, timeout=20)
+        escaped, worked = probe.exists(), (work_p / "inside").exists()
+        probe.unlink(missing_ok=True)
+    if escaped:
+        return Check("test confinement", "fail", "sandbox-exec ran but did NOT block a write outside",
+                     "Do not run scheduled shifts until this is understood.")
+    if not worked:
+        return Check("test confinement", "fail", "sandbox-exec blocked writes inside the worktree too",
+                     "Tests cannot run confined; check macOS version and the jail profile.")
+    return Check("test confinement", "ok", "tests the agent edits run in sandbox-exec: "
+                 "no writes outside the worktree, no network, no credential reads")
+
+
 def _repo(repo: Path) -> list[Check]:
     from .autonomy.shift import failing_set
     from .service import protected_paths
@@ -152,6 +189,10 @@ def run(repo: str | Path | None = None) -> list[Check]:
             checks.append(fn())
         except Exception as exc:
             checks.append(Check(fn.__name__.strip("_"), "fail", f"check crashed: {exc}"))
+    try:
+        checks.append(_confinement())
+    except Exception as exc:
+        checks.append(Check("test confinement", "fail", f"check crashed: {exc}"))
     for group in (_other_brains, _tools, _scheduler):
         try:
             checks.extend(group())

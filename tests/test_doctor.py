@@ -102,3 +102,23 @@ def test_a_crashing_check_is_reported_not_raised(monkeypatch):
     checks = doctor.run()
     assert any(c.status == "fail" and "kaboom" in c.detail for c in checks)
     assert "1 failing" in doctor.render(checks)
+
+
+def test_confinement_is_probed_not_assumed():
+    from journeyman.autonomy import jail
+
+    c = doctor._confinement()
+    if jail.available():
+        assert c.status == "ok", c.detail
+    else:
+        assert c.status == "warn"
+
+
+def test_a_sandbox_that_stopped_enforcing_is_a_failure(monkeypatch, tmp_path):
+    """Apple deprecated sandbox-exec. If it ever silently stops enforcing, say so."""
+    from journeyman.autonomy import jail
+
+    monkeypatch.setattr(jail, "available", lambda: True)
+    monkeypatch.setattr(jail, "wrap", lambda argv, work, env: (argv, {"PATH": "/bin:/usr/bin"}, True))
+    c = doctor._confinement()
+    assert c.status == "fail" and "did NOT block" in c.detail
