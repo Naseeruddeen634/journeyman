@@ -96,6 +96,16 @@ def _review(args) -> int:
     from .patterns.smells import review, summarise
 
     findings = review(args.repo)
+    failing = any(f.severity >= args.fail_on for f in findings)
+
+    if args.format != "text":
+        from . import ci
+        render = {"json": ci.to_json, "github": ci.to_github, "sarif": ci.to_sarif}[args.format]
+        out = render(findings)
+        if out:
+            print(out)
+        return 1 if failing else 0
+
     print(f"\n  {summarise(findings)}\n")
     if not findings:
         print("  Nothing to flag.\n")
@@ -113,7 +123,7 @@ def _review(args) -> int:
         print()
     if not args.verbose:
         print("  Run with --verbose for the reasoning and the fix.\n")
-    return 1 if any(f.severity >= 80 for f in findings) else 0
+    return 1 if failing else 0
 
 
 def _shift(args) -> int:
@@ -462,6 +472,26 @@ def _mcp(args) -> int:
     return 0
 
 
+def _ci(args) -> int:
+    """Write a GitHub Actions workflow that runs the review on every pull request."""
+    from .ci import init_workflow
+
+    try:
+        from .ci import DEFAULT_INSTALL
+    path, written = init_workflow(Path(args.repo).resolve(), install=args.install or DEFAULT_INSTALL,
+                                      fail_on=args.fail_on, overwrite=args.overwrite)
+    except ValueError as exc:
+        print(f"\n  {exc}\n", file=sys.stderr)
+        return 2
+    if not written:
+        print(f"\n  {path} already exists. Use --overwrite to replace it.\n")
+        return 1
+    print(f"\n  Wrote {path}")
+    print("  On every pull request: findings as inline annotations on the diff, SARIF to code")
+    print(f"  scanning, and the job fails on anything at severity {args.fail_on} or above.\n")
+    return 0
+
+
 def _brain(args) -> int:
     from .brain.models import check
     st = check()
@@ -508,6 +538,9 @@ def main(argv: list[str] | None = None) -> int:
     rv.add_argument("--repo", default=".")
     rv.add_argument("--limit", type=int, default=20)
     rv.add_argument("-v", "--verbose", action="store_true")
+    rv.add_argument("--format", choices=["text", "json", "github", "sarif"], default="text")
+    rv.add_argument("--fail-on", type=int, default=80, metavar="SEVERITY",
+                    help="exit 1 if any finding is at least this severe (default 80)")
     rv.set_defaults(func=_review)
 
     sh = sub.add_parser("shift", help="work one task unattended and report")
@@ -568,6 +601,15 @@ def main(argv: list[str] | None = None) -> int:
     pr.add_argument("--interval", type=float, default=1.0)
     pr.add_argument("--notify", action="store_true", help="macOS banner when something goes red")
     pr.set_defaults(func=_pair)
+
+    ci = sub.add_parser("ci", help="write a GitHub Actions workflow for the review")
+    ci.add_argument("action", choices=["init"])
+    ci.add_argument("--repo", default=".")
+    ci.add_argument("--install", default=None,
+                    help="pip install target: a git URL or path, never a bare name")
+    ci.add_argument("--fail-on", type=int, default=80)
+    ci.add_argument("--overwrite", action="store_true")
+    ci.set_defaults(func=_ci)
 
     mc = sub.add_parser("mcp", help="serve read-only tools to MCP clients (Claude Code, Cursor)")
     mc.set_defaults(func=_mcp)
