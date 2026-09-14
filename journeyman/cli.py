@@ -474,11 +474,11 @@ def _mcp(args) -> int:
 
 def _ci(args) -> int:
     """Write a GitHub Actions workflow that runs the review on every pull request."""
-    from .ci import init_workflow
+    from .ci import DEFAULT_INSTALL, init_workflow
 
     try:
-        from .ci import DEFAULT_INSTALL
-    path, written = init_workflow(Path(args.repo).resolve(), install=args.install or DEFAULT_INSTALL,
+        path, written = init_workflow(Path(args.repo).resolve(),
+                                      install=args.install or DEFAULT_INSTALL,
                                       fail_on=args.fail_on, overwrite=args.overwrite)
     except ValueError as exc:
         print(f"\n  {exc}\n", file=sys.stderr)
