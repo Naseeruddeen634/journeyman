@@ -105,6 +105,7 @@ class StreamsForever(Model):
 
     def __init__(self):
         self.cfg = {}
+        self.deltas = 0
 
     def update_config(self, **kw):
         self.cfg.update(kw)
@@ -121,6 +122,7 @@ class StreamsForever(Model):
         yield {"messageStart": {"role": "assistant"}}
         yield {"contentBlockStart": {"start": {}}}
         while True:
+            self.deltas += 1
             yield {"contentBlockDelta": {"delta": {"text": "and again "}}}
             await asyncio.sleep(0.01)
 
@@ -130,17 +132,26 @@ def test_the_watchdog_interrupts_a_generation_in_progress():
     import threading
     import time
 
-    agent = Agent(model=StreamsForever(), callback_handler=None)
+    model = StreamsForever()
+    agent = Agent(model=model, callback_handler=None)
     timer = threading.Timer(0.5, agent.cancel)
     timer.start()
     started = time.monotonic()
+    outcome: object = None
     try:
-        agent("go")
-    except Exception:
-        pass            # cancelled is the outcome; how it surfaces is the SDK's business
+        outcome = agent("go")
+    except Exception as exc:  # the SDK may surface cancellation as either; record which
+        outcome = exc
     finally:
         timer.cancel()
-    assert time.monotonic() - started < 10, "a runaway generation must be interruptible"
+    elapsed = time.monotonic() - started
+
+    # The reviewer flagged the first version, which swallowed every exception: an
+    # instant unrelated failure would also have finished quickly and passed. So
+    # prove the generation was genuinely running, and ran until the timer fired.
+    assert model.deltas > 20, f"the model was not streaming when cancelled ({model.deltas} deltas)"
+    assert 0.4 < elapsed < 10, f"stopped at {elapsed:.2f}s, not by the 0.5s timer"
+    assert outcome is not None
 
 
 def test_the_local_brain_sets_a_real_context_window_and_bounded_output(monkeypatch):

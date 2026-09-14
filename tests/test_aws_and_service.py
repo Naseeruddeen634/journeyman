@@ -480,3 +480,50 @@ def test_a_scheduled_run_that_delivers_says_so(tmp_path, monkeypatch):
     assert sent == []
     importlib.reload(home)
     importlib.reload(cli)
+
+
+# ---- what running it on a local model taught the reviewer --------------
+
+OLD_BRAINS = '''
+from strands.models.ollama import OllamaModel
+from strands.models.openai import OpenAIModel
+
+def local_brain():
+    return OllamaModel(host="http://localhost:11434", model_id="qwen3-coder:30b", temperature=0.2)
+
+def heavy_brain(key):
+    return OpenAIModel(client_args={"api_key": key}, model_id=MODEL, params={"temperature": 0.3})
+'''
+
+
+def test_journeymans_own_old_brains_would_now_be_flagged(tmp_path):
+    """The exact code that ran every shift with a 4K window and no output limit."""
+    (tmp_path / "models.py").write_text(OLD_BRAINS)
+    codes = [f.code for f in review(tmp_path)]
+    assert codes.count("AIE002") == 2, codes
+    assert "AIE014" in codes
+
+
+def test_the_fixed_brains_are_clean(tmp_path):
+    (tmp_path / "models.py").write_text(
+        'from strands.models.ollama import OllamaModel\n'
+        'def local_brain():\n'
+        '    return OllamaModel(host="h", model_id=MODEL, max_tokens=4096,\n'
+        '                       options={"num_ctx": 16384})\n')
+    assert review(tmp_path) == []
+
+
+def test_raw_ollama_chat_without_num_ctx_is_flagged(tmp_path):
+    (tmp_path / "a.py").write_text(
+        'import ollama\n'
+        'def ask(q):\n'
+        '    return ollama.chat(model=MODEL, messages=[{"role": "user", "content": q}])\n')
+    assert any(f.code == "AIE014" for f in review(tmp_path))
+
+
+def test_constructor_with_config_splat_is_given_the_benefit_of_the_doubt(tmp_path):
+    (tmp_path / "a.py").write_text(
+        'from strands.models import BedrockModel\n'
+        'def m(cfg):\n'
+        '    return BedrockModel(model_id=MODEL, **cfg)\n')
+    assert not any(f.code == "AIE002" for f in review(tmp_path))

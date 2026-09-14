@@ -51,6 +51,7 @@ LLM_MARKERS = re.compile(
     r"ChatPromptTemplate|system_prompt|completion\(|bedrock-runtime|converse|"
     # Prompt-building modules often never import an SDK: the client lives
     # elsewhere. The opening line of nearly every LLM prompt is the tell.
+    r"OllamaModel|ChatOllama|BedrockModel|OpenAIModel|AnthropicModel|LiteLLMModel|"
     r"[\"']You are (?:a|an|the) |[\"']role[\"']\s*:\s*[\"'](?:system|assistant)[\"'])",
     re.I,
 )
@@ -405,6 +406,90 @@ def check_nondeterministic_tests(path: Path, text: str, tree: ast.AST, rel: str)
     return out
 
 
+MODEL_CONSTRUCTORS = ("OllamaModel", "BedrockModel", "OpenAIModel", "AnthropicModel",
+                      "LiteLLMModel", "ChatOllama", "ChatOpenAI", "ChatAnthropic",
+                      "ChatBedrock", "ChatBedrockConverse")
+OUTPUT_LIMIT_KWARGS = {"max_tokens", "max_output_tokens", "max_completion_tokens",
+                       "num_predict", "maxTokens"}
+
+
+def _kwarg_names(node: ast.Call) -> set[str]:
+    """Keyword names on a call, including keys of a literal params=/options= dict."""
+    names = {k.arg for k in node.keywords if k.arg}
+    for k in node.keywords:
+        if k.arg in ("params", "options", "model_kwargs", "additional_args") \
+                and isinstance(k.value, ast.Dict):
+            names |= {key.value for key in k.value.keys
+                      if isinstance(key, ast.Constant) and isinstance(key.value, str)}
+    return names
+
+
+def check_unbounded_model_constructor(path: Path, text: str, tree: ast.AST, rel: str) -> list[Finding]:
+    """AIE002 for frameworks: the output limit is set where the model is built.
+
+    The call-site version of this check could not see Strands, LangChain or
+    LiteLLM, where a model object is constructed once and called many times.
+    Journeyman's own three brains were built exactly this way, with no output
+    limit, and its own reviewer passed them.
+    """
+    out = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        name = _call_name(node).split(".")[-1]
+        if name not in MODEL_CONSTRUCTORS:
+            continue
+        kwargs = _kwarg_names(node)
+        if any(k is None for k in (kw.arg for kw in node.keywords)):
+            continue   # **config passed through; the limit may be in there
+        if kwargs & OUTPUT_LIMIT_KWARGS:
+            continue
+        out.append(Finding(
+            code="AIE002",
+            title=f"{name}(...) is built with no output limit",
+            why=("Every call through this model object inherits it. Output length is then "
+                 "whatever the model decides, which is unbounded cost and unbounded latency, "
+                 "and a local model stuck in a repetition loop will not stop at all."),
+            fix=(f"Pass max_tokens when constructing {name} (num_predict for raw Ollama). "
+                 "Set it once here rather than at every call."),
+            where=f"{rel}:{node.lineno}", severity=60,
+        ))
+    return out
+
+
+def check_ollama_default_context(path: Path, text: str, tree: ast.AST, rel: str) -> list[Finding]:
+    """AIE014. Ollama's default context window is 4096 tokens, and overflow is silent."""
+    if "num_ctx" in text:
+        return []
+    if not re.search(r"\b(ollama|OllamaModel|ChatOllama)\b", text):
+        return []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        name = _call_name(node)
+        last = name.split(".")[-1]
+        is_ctor = last in ("OllamaModel", "ChatOllama")
+        is_call = name in ("ollama.chat", "ollama.generate") or \
+            (last in ("chat", "generate") and "ollama" in name.lower())
+        if not (is_ctor or is_call):
+            continue
+        return [Finding(
+            code="AIE014",
+            title=f"{last}(...) runs with Ollama's default 4096-token context",
+            why=("Ollama does not use the model's real context length unless told to. At 4096 "
+                 "tokens an agent's system prompt, tool definitions and a couple of file reads "
+                 "fill the window, and when it overflows mid-generation Ollama keeps a handful "
+                 "of tokens from the start and discards the rest, which is usually the "
+                 "instructions. Nothing errors; the answers just get worse. This was measured, "
+                 "not guessed: a context shift that kept 4 tokens and discarded 2,045."),
+            fix=("Set num_ctx explicitly, e.g. options={'num_ctx': 16384} for OllamaModel or "
+                 "ollama.chat, num_ctx=16384 for ChatOllama. Larger windows cost KV-cache memory, "
+                 "so size it to the prompts you actually send."),
+            where=f"{rel}:{node.lineno}", severity=75,
+        )]
+    return []
+
+
 def check_prompt_without_eval(repo: Path) -> list[Finding]:
     """AIE008. The one that matters most. A prompt nobody measures."""
     prompt_files: list[tuple[Path, str]] = []
@@ -599,6 +684,7 @@ FILE_CHECKS = [
     check_nondeterministic_tests, check_untracked_cost,
     check_bedrock_no_adaptive_retry, check_invoke_model_over_converse,
     check_bedrock_region_not_pinned, check_no_bedrock_guardrail,
+    check_unbounded_model_constructor, check_ollama_default_context,
 ]
 
 
