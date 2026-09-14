@@ -305,6 +305,7 @@ def _run_scheduled(args) -> int:
             return 1
         print(f"  PREFLIGHT OK: can start, {len(repos)} repo(s), brain available", flush=True)
         return 0
+    delivered = []
     for repo in repos:
         if not Path(repo).exists():
             print(f"  {repo}: gone, skipping", flush=True)
@@ -312,11 +313,26 @@ def _run_scheduled(args) -> int:
         log = stand_watch(repo, max_shifts=args.max_shifts, max_hours=1.0, interval_s=5)
         for s in log.shifts:
             record_shift(repo, s.to_dict())
+            if s.outcome in ("fixed", "fixed_with_concerns"):
+                delivered.append((repo, s))
         if log.shifts:
             print(f"  {repo}", flush=True)
             print(morning_report(log), flush=True)
         else:
             print(f"  {repo}: nothing to do", flush=True)
+
+    if delivered and not args.no_notify:
+        # A fix delivered at 3am is only useful if you hear about it.
+        from .pair import macos_notify
+
+        first_repo, first = delivered[0]
+        flagged = sum(1 for _, s in delivered if s.concerns)
+        msg = (f"{len(delivered)} fix(es) ready on branches in {Path(first_repo).name}: "
+               f"{first.task.title[:60] if first.task else ''}"
+               + (f" ({flagged} flagged, read the diff)" if flagged else "")
+               + ". Run journeyman propose.")
+        macos_notify(msg)
+        print(f"  notified: {msg}", flush=True)
     return 0
 
 
@@ -524,6 +540,7 @@ def main(argv: list[str] | None = None) -> int:
     rs.add_argument("--repo", action="append")
     rs.add_argument("--max-shifts", type=int, default=2)
     rs.add_argument("--dry-run", action="store_true", help="preflight only, edit nothing")
+    rs.add_argument("--no-notify", action="store_true", help="no macOS banner when fixes are ready")
     rs.set_defaults(func=_run_scheduled)
 
     ev = sub.add_parser("eval", help="build or run an eval harness for a prompt file")

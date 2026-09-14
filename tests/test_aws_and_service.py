@@ -444,3 +444,39 @@ def test_a_stale_self_contained_copy_is_noticed(tmp_path, monkeypatch):
     assert svc.app_freshness()["stale"] is False
     (src / "journeyman" / "a.py").write_text("X = 2\n")
     assert svc.app_freshness()["stale"] is True
+
+
+def test_a_scheduled_run_that_delivers_says_so(tmp_path, monkeypatch):
+    """A fix delivered at 3am is only useful if you hear about it."""
+    import importlib
+
+    monkeypatch.setenv("JOURNEYMAN_HOME", str(tmp_path / "home"))
+    import journeyman.home as home
+    importlib.reload(home)
+    import journeyman.cli as cli
+    importlib.reload(cli)
+
+    from journeyman.autonomy.scout import Task
+    from journeyman.autonomy.shift import ShiftResult
+    from journeyman.autonomy.watch import WatchLog
+
+    repo = tmp_path / "billing"
+    (repo / ".git").mkdir(parents=True)
+    fixed = ShiftResult(task=Task("failing_test", "vat adds a flat amount", "", "t.py", 100),
+                        outcome="fixed", branch="journeyman/x",
+                        concerns=["It lists 2 changes but the diff moves 1 line(s)."])
+    log = WatchLog(shifts=[fixed])
+    monkeypatch.setattr("journeyman.autonomy.watch.stand_watch", lambda *a, **k: log)
+    sent = []
+    monkeypatch.setattr("journeyman.pair.macos_notify", sent.append)
+
+    assert cli.main(["run-scheduled", "--repo", str(repo), "--max-shifts", "1"]) == 0
+    assert len(sent) == 1
+    assert "1 fix(es) ready" in sent[0] and "billing" in sent[0]
+    assert "1 flagged, read the diff" in sent[0]
+
+    sent.clear()
+    assert cli.main(["run-scheduled", "--repo", str(repo), "--no-notify"]) == 0
+    assert sent == []
+    importlib.reload(home)
+    importlib.reload(cli)
