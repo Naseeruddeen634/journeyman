@@ -158,6 +158,7 @@ def _shift(args) -> int:
         max_files_changed=args.max_files,
         max_commands=args.max_commands,
         max_iterations=args.max_iterations,
+        max_heavy_calls=args.max_paid_calls,
     )
     result = work_one(args.repo, budget=budget, keep_worktree=not args.cleanup,
                       spec_check=args.spec_check)
@@ -589,6 +590,8 @@ def main(argv: list[str] | None = None) -> int:
     sh.add_argument("--max-commands", type=int, default=120)
     sh.add_argument("--max-iterations", type=int, default=8)
     sh.add_argument("--cleanup", action="store_true", help="remove the worktree afterwards")
+    sh.add_argument("--max-paid-calls", type=int, default=6,
+                    help="model calls allowed on a metered brain (Bedrock, API); the local model is free")
     sh.add_argument("--spec-check", action="store_true",
                     help="two independent checkers write tests from the docs; the change must pass them")
     sh.set_defaults(func=_shift)

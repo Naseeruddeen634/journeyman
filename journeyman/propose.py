@@ -77,6 +77,12 @@ def body(record: dict, stat: str) -> str:
                    f"{'no longer fires on this file' if record['finding_resolved'] else 'STILL FIRES'}.")
     if record.get("findings_introduced"):
         out.append(f"- New review findings introduced: {', '.join(record['findings_introduced'])}")
+    spec = record.get("spec_check") or ""
+    if spec.startswith("passed"):
+        out.append(f"- Independent check {spec}: written from the task and the pre-change "
+                   "docstrings by agents that never saw this change.")
+    elif spec and not spec.startswith("not run"):
+        out.append(f"- Independent check: {spec}")
     if record.get("feedback_rounds"):
         out.append(f"- Claimed done {record['feedback_rounds']} time(s) before it actually was; "
                    "each time it was sent back with what was still wrong.")
@@ -92,8 +98,10 @@ def body(record: dict, stat: str) -> str:
                 "The agent flagged these about its own change:", ""]
         out += [f"> {c}" for c in concerns] + [""]
 
+    ran = "the repository's own test suite, Journeyman's static review checks" + (
+        " and the independent spec check" if spec.startswith("passed") else "")
     out += ["## What was not checked", "",
-            "- Only the repository's own test suite and Journeyman's static review checks were run.",
+            f"- Only {ran} were run.",
             "- Behaviour those tests do not cover is unverified. A green suite is necessary, not sufficient.",
             "- No integration, load, or manual testing was done.", ""]
 

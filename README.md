@@ -22,6 +22,7 @@ on a branch, and hands you the evidence, including the parts it is unsure about.
 | from your IDE agent | `journeyman mcp` | the same review and inspection tools, read-only, for Claude Code, Cursor or any MCP client |
 | a prompt has no eval | `journeyman eval prompts/x.txt` | cases with a held-out split, recorded responses, and a CI test that fails if quality drops |
 | you are away | `journeyman shift` / `watch` | takes the most important broken thing, fixes it in an isolated worktree, verifies it independently, leaves a branch |
+| your team, from anywhere | AgentCore reviewer | the same review as a service on Amazon Bedrock AgentCore, explained by Claude on Bedrock |
 | every few hours | `journeyman install` | the same, on a schedule, verified to actually run |
 | the work is done | `journeyman propose` | a pull request description written from the evidence, and the two commands for **you** to run |
 | you want to know if it is any good | `journeyman bench` | its fix rate against hidden oracles it never sees |
@@ -308,6 +309,49 @@ Before writing anything, `install` loads a throwaway job with the same program, 
 and environment in `--dry-run` mode and waits for it to exit cleanly. If launchd cannot
 actually start it, nothing is installed and you get the reason. `status` reports how many
 times it has really run and its last exit code, not just whether it is registered.
+
+## On AWS: the reviewer on Amazon Bedrock AgentCore
+
+The same review runs as a service on **Amazon Bedrock AgentCore Runtime**, so a team can call it from
+CI or a chat bot with no local model and nothing installed. Each invocation runs in its own isolated
+session. The findings are deterministic (the same code as `journeyman review`); a Strands agent on
+**Claude in Amazon Bedrock** only explains them, reading the flagged lines through a read-only tool
+confined to the repository. Nothing from the repository is executed.
+
+```bash
+python scripts/agentcore_review.py ~/code/helpdesk-ai --arn <runtime ARN> --mode explain
+```
+
+Captured from the deployed runtime (us-east-1), unedited apart from truncation:
+
+```
+  helpdesk-ai: 6 finding(s), reviewed on AgentCore
+
+  [85] AIE008  prompts/triage_prompt.txt is a prompt with no eval
+  [70] AIE003  model output parsed with json.loads and no schema
+        app/triage.py:21
+  ...
+  ### 1. `json.loads` with no fence-stripping will crash in production — `app/triage.py:21`
+
+  The prompt says "Reply with JSON only" but models routinely wrap their output in a markdown
+  code fence anyway ...
+```
+
+Review mode (findings only) answered in under 5 seconds, explain mode in about 20. The full
+response is in `docs/submission/captured/`. It also shows why the explanation is kept apart from the
+findings: the model wrote that the OpenAI client has "no timeout at all", when the SDK's default is
+ten minutes. The finding (no timeout set in this file) is right; the prose around it is a model's.
+
+A private or unpushed repository is sent as an archive of its committed HEAD, so the service never
+needs access to where the code lives. Only `https://github.com/owner/name` URLs are fetched otherwise.
+
+Deploying it (starter toolkit, direct code deploy, no Docker):
+
+```bash
+agentcore configure -e agentcore_app.py -n journeyman_reviewer -r us-east-1 \
+  -rf requirements-agentcore.txt --deployment-type direct_code_deploy --runtime PYTHON_3_13
+agentcore deploy
+```
 
 ## The brains
 

@@ -1,0 +1,37 @@
+
+  Journeyman night shift
+  local ok (qwen3-coder:30b) | heavy off | bedrock ok
+
+
+========================================================================
+  FIXED   failed: test_the_newest_message_survives_trimming - Ind...
+          tests/test_context.py
+========================================================================
+
+  brain     global.anthropic.claude-sonnet-4-6 (JOURNEYMAN_PREFER=bedrock, running in us-west-2)
+  branch    journeyman/20260914-2028-failed--test-the-newest-message-survives
+  commit    468a708
+  tests     1 red before, 0 red after
+            fixed:  tests/test_context.py::test_the_newest_message_survives_trimming
+  took      0.8 min
+  feedback  sent back 1 time(s) after claiming done
+  checked   passed: 10 independent test(s)
+  budget    11/40 turns, 4/120 commands, 11/40 paid calls
+
+  changed:
+    app/context.py
+
+  what it says:
+    The existing tests still pass, and the new logic now correctly:
+    1. Always preserves the system message (never pops it)
+    2. Drops the oldest non-system message first
+    3. Stops if only the system message remains (can't trim further)
+    
+    DONE: Fixed `fit()` to honour the documented invariant — the system 
+
+  Review it:  git diff main..journeyman/20260914-2028-failed--test-the-newest-message-survives
+
+  full record: /Users/nachu/.journeyman/shifts/20260914-202917_helpdesk-ai.json
+
+  Turn it into a pull request:  journeyman propose --repo .
+

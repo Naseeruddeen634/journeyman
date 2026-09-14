@@ -40,7 +40,22 @@ LOCAL_CTX = int(os.environ.get("JOURNEYMAN_LOCAL_CTX", "16384"))
 # Bounded output. Journeyman's reviewer flags an unbounded model call as AIE002;
 # its own brains were exactly that.
 MAX_OUTPUT_TOKENS = int(os.environ.get("JOURNEYMAN_MAX_OUTPUT_TOKENS", "4096"))
-BEDROCK_REGION = os.environ.get("AWS_REGION", "us-west-2")
+def _configured_region() -> str | None:
+    """The region `aws configure` or `aws login` set. Reading only AWS_REGION reported us-west-2
+    to someone whose CLI was configured for us-east-1, and sent their calls there."""
+    try:
+        import boto3
+        from botocore.exceptions import BotoCoreError
+    except ImportError:
+        return None
+    try:
+        return boto3.session.Session().region_name
+    except BotoCoreError:           # a profile that does not parse: use the fallback, loudly elsewhere
+        return None
+
+
+BEDROCK_REGION = (os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION")
+                  or _configured_region() or "us-west-2")
 HEAVY_MODEL = os.environ.get("JOURNEYMAN_HEAVY_MODEL", "moonshotai/kimi-k3")
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 HEAVY_BASE_URL = os.environ.get("JOURNEYMAN_HEAVY_BASE_URL", "https://openrouter.ai/api/v1")

@@ -1,0 +1,91 @@
+
+  helpdesk-ai: 6 finding(s), reviewed on AgentCore
+
+  [85] AIE008  prompts/triage_prompt.txt is a prompt with no eval
+        prompts/triage_prompt.txt
+  [70] AIE003  model output parsed with json.loads and no schema
+        app/triage.py:21
+  [70] AIE005  client.chat.completions.create() has no timeout or retry anywhere in this file
+        app/triage.py:14
+  [70] AIE005  client.chat.completions.create() has no timeout or retry anywhere in this file
+        app/replies.py:14
+  [60] AIE001  model id 'gpt-4o-mini' is hardcoded
+        app/triage.py:15
+  [60] AIE002  client.chat.completions.create() has no max_tokens
+        app/triage.py:14
+
+  Here are the three issues worth stopping the review for:
+  
+  ---
+  
+  ### 1. `json.loads` with no fence-stripping will crash in production — `app/triage.py:21`
+  
+  The prompt says "Reply with JSON only" but models routinely wrap their output in a markdown code fence anyway (` ```json\n{...}\n``` `). When that happens `json.loads` raises `JSONDecodeError` and the whole triage call blows up. There is also zero schema validation, so a hallucinated key name or wrong type silently propagates downstream.
+  
+  **Smallest fix:**
+  
+  ```python
+  # app/triage.py
+  import json, re
+  from pydantic import BaseModel
+  
+  class TriageResult(BaseModel):
+      queue: str      # "billing" | "technical" | "account" | "other"
+      urgency: str    # "low" | "normal" | "urgent"
+      summary: str
+  
+  def triage(ticket_text: str) -> TriageResult:
+      response = client.chat.completions.create(...)
+      raw = response.choices[0].message.content
+      # strip optional ```json ... ``` fence
+      raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw.strip())
+      return TriageResult.model_validate(json.loads(raw))
+  ```
+  
+  The better long-term fix is to use OpenAI's `response_format={"type": "json_object"}` or structured outputs so the fence problem never arises.
+  
+  ---
+  
+  ### 2. No timeout on either API call — `app/triage.py:14` and `app/replies.py:14`
+  
+  Neither call sets a timeout. OpenAI's default is no timeout at all, so a slow or hung request will block the calling thread (or coroutine) forever. Under any real load this will exhaust your thread pool or connection pool and take down the service.
+  
+  **Smallest fix — apply the same pattern to both files:**
+  
+  ```python
+  # app/triage.py:14  (and app/replies.py:14 identically)
+  from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
+  
+  @retry(
+      retry=retry_if_exception(lambda e: isinstance(e, openai.RateLimitError)
+                                      or isinstance(e, openai.InternalServerError)),
+      wait=wait_exponential(multiplier=1, min=2, max=30),
+      stop=stop_after_attempt(4),
+  )
+  def triage(ticket_text: str) -> TriageResult:
+      response = client.chat.completions.create(
+          model=MODEL,
+          messages=[...],
+          timeout=20,        # seconds; tune to your p99 latency
+          max_tokens=200,    # triage output is small; cap it
+      )
+  ```
+  
+  Do **not** retry on `openai.BadRequestError` (400s) — those are bugs in your code and retrying just burns quota while hiding the problem.
+  
+  ---
+  
+  ### 3. Model ID hardcoded in `triage.py`, inconsistently with `replies.py` — `app/triage.py:15`
+  
+  `replies.py` already promotes the model to a module-level constant (`MODEL = "gpt-4o-mini"`), but `triage.py` inlines it directly in the call. When you need to swap models (A/B test, cost cut, deprecation) you'll miss this one. Worse, the two files can silently diverge.
+  
+  **Smallest fix:**
+  
+  ```python
+  # app/triage.py  — add near the top, remove the literal from the create() call
+  import os
+  MODEL = os.environ.get("APP_MODEL", "gpt-4o-mini")
+  ```
+  
+  Then reference `model=MODEL` in the call, and ideally move the constant to a shared `app/config.py` so both files import the same value.
+
