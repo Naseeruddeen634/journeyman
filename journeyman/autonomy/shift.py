@@ -707,6 +707,11 @@ def work_one(repo: str | Path, task: Task | None = None, budget: Budget | None =
     result.concerns = find_concerns(result.summary) + claims_vs_diff(
         result.summary, result.diff
     )
+    if guard.stopped_by and result.files_changed:
+        # The work was interrupted, not finished. The checks below decide whether it is still
+        # usable, but "fixed" with no mention of that read as if the agent had said DONE.
+        result.concerns.append(f"Stopped before it said DONE ({guard.stopped_by}). Everything "
+                               "below was verified after the stop, on the change as it was left.")
 
     if task.kind == "ai_review" and review_code:
         findings_after = finding_counts(sandbox.root, review_file)
@@ -723,9 +728,18 @@ def work_one(repo: str | Path, task: Task | None = None, budget: Budget | None =
     admitted = admits_contract_conflict(result.summary)
 
     spec_broke = ""
-    if spec_check and result.files_changed and not guard.stopped_by:
-        if spec_codes is None:          # no feedback round ran, so the check has not been written
-            spec_codes = independent_checks()
+    if spec_check and result.files_changed:
+        # The checks already written run whatever stopped the agent: judging them costs no
+        # model calls. A demo shift ran out of turns while the checker was still reporting
+        # that its fix dropped the system message, skipped this, and was delivered as FIXED.
+        if spec_codes is None:
+            if guard.stopped_by:
+                result.spec_check = "not run: the budget ran out before the check could be written"
+                result.concerns.append("Stopped by the budget before the independent check ran; "
+                                       "the change was verified by the existing tests only.")
+                spec_codes = []
+            else:                       # no feedback round ran, so the check has not been written
+                spec_codes = independent_checks()
         if len(spec_codes) >= 2:
             final = _spec.judge_all(sandbox.root, spec_codes)
             if not final.usable:
@@ -832,6 +846,8 @@ def report(result: ShiftResult) -> str:
         lines.append(f"  STOPPED   {result.stopped_by}")
     if result.feedback_rounds:
         lines.append(f"  feedback  sent back {result.feedback_rounds} time(s) after claiming done")
+    if result.spec_check:
+        lines.append(f"  checked   {result.spec_check[:200]}")
     if result.confined is False:
         lines.append("  UNCONFINED  the repository's tests ran without an OS sandbox on this platform")
     if result.finding_resolved is not None:

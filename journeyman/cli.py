@@ -159,7 +159,8 @@ def _shift(args) -> int:
         max_commands=args.max_commands,
         max_iterations=args.max_iterations,
     )
-    result = work_one(args.repo, budget=budget, keep_worktree=not args.cleanup)
+    result = work_one(args.repo, budget=budget, keep_worktree=not args.cleanup,
+                      spec_check=args.spec_check)
     print(report(result))
 
     # One place for every shift, manual or scheduled, so history and propose
@@ -588,6 +589,8 @@ def main(argv: list[str] | None = None) -> int:
     sh.add_argument("--max-commands", type=int, default=120)
     sh.add_argument("--max-iterations", type=int, default=8)
     sh.add_argument("--cleanup", action="store_true", help="remove the worktree afterwards")
+    sh.add_argument("--spec-check", action="store_true",
+                    help="two independent checkers write tests from the docs; the change must pass them")
     sh.set_defaults(func=_shift)
 
     w = sub.add_parser("watch", help="stand watch and keep working the queue")
