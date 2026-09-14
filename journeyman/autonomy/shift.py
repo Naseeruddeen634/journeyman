@@ -217,6 +217,59 @@ def resolution(code: str, before: dict[str, int], after: dict[str, int]) -> tupl
     return resolved, introduced
 
 
+def gather_context(root: Path, task: Task, limit_chars: int = 14000) -> str:
+    """Hand the agent the files it would otherwise spend turns opening.
+
+    For a failing test: the files named in the traceback, the test file, and the
+    repository modules that test imports. For a review finding: the file it was
+    found in. Numbered lines, capped, most specific first.
+
+    Turns are the budget, and on a local model they are also the wall clock, so
+    every read_file the harness can answer for free is time back.
+    """
+    import re as _re
+
+    from ..pair import import_graph
+
+    root = root.resolve()
+    ordered: list[Path] = []
+
+    def add(p: Path) -> None:
+        p = p.resolve()
+        try:
+            p.relative_to(root)
+        except ValueError:
+            return
+        if p.suffix == ".py" and p.exists() and p not in ordered:
+            ordered.append(p)
+
+    where = root / task.where.split(":")[0]
+    if task.kind == "failing_test":
+        for m in _re.finditer(r"([\w./-]+\.py):\d+", task.evidence or ""):
+            add(root / m.group(1))
+        add(where)
+        graph = import_graph(root)
+        for test in list(ordered):
+            for dep in sorted(graph.get(test.resolve(), ())):
+                add(dep)
+    else:
+        add(where)
+
+    chunks, used = [], 0
+    for p in ordered:
+        rel = p.relative_to(root)
+        lines = p.read_text(encoding="utf8", errors="ignore").splitlines()
+        body = "\n".join(f"{i:5d}  {l}" for i, l in enumerate(lines[:400], 1))
+        block = f"--- {rel} ---\n{body}\n"
+        if used + len(block) > limit_chars:
+            if not chunks:
+                chunks.append(block[:limit_chars])
+            break
+        chunks.append(block)
+        used += len(block)
+    return "\n".join(chunks)
+
+
 FEEDBACK = """Not done yet. I checked your work independently, and this is what I found:
 
 {feedback}
@@ -406,7 +459,7 @@ def _tools_for(sandbox: Sandbox, result: ShiftResult, task: Task | None = None):
 
 def work_one(repo: str | Path, task: Task | None = None, budget: Budget | None = None,
              difficulty: str = "routine", keep_worktree: bool = True,
-             max_feedback_rounds: int = 2) -> ShiftResult:
+             max_feedback_rounds: int = 2, pregather: bool = False) -> ShiftResult:
     """Do one task, end to end, unattended."""
     repo = Path(repo).resolve()
     budget = budget or Budget()
@@ -457,6 +510,11 @@ def work_one(repo: str | Path, task: Task | None = None, budget: Budget | None =
     )
     if task.evidence:
         brief += f"\nEvidence:\n{task.evidence[:2500]}\n"
+    if pregather:
+        context = gather_context(sandbox.root, task)
+        if context:
+            brief += ("\nRelevant files, already read for you. Use read_file only for "
+                      "files not shown here:\n\n" + context)
 
     # A local model is free; anything else is metered against max_heavy_calls.
     guard = BudgetGuard(budget, paid=(name != LOCAL_MODEL))

@@ -471,3 +471,32 @@ def test_finding_counts_reads_the_real_reviewer(tmp_path):
         '    return "<q>" + q + "</q>"\n')
     after = finding_counts(tmp_path, "app.py")
     assert after.get("AIE004", 0) == 0
+
+
+def test_gather_context_follows_the_traceback_and_the_tests_imports(tmp_path):
+    from journeyman.autonomy.scout import Task
+    from journeyman.autonomy.shift import gather_context
+
+    (tmp_path / "lib").mkdir()
+    (tmp_path / "lib" / "__init__.py").write_text("")
+    (tmp_path / "lib" / "money.py").write_text("def vat(n):\n    return n + 23\n")
+    (tmp_path / "lib" / "other.py").write_text("X = 1\n")
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "test_money.py").write_text(
+        "from lib.money import vat\n\ndef test_vat():\n    assert vat(100) == 123.0\n")
+    task = Task(kind="failing_test", title="t", detail="", where="tests/test_money.py",
+                priority=100, evidence="tests/test_money.py:4: AssertionError")
+    ctx = gather_context(tmp_path, task)
+    assert "--- tests/test_money.py ---" in ctx
+    assert "--- lib/money.py ---" in ctx, "the module under test should come with it"
+    assert "other.py" not in ctx, "unrelated files stay out"
+    assert "    2      return n + 23" in ctx, "lines are numbered"
+
+
+def test_gather_context_respects_its_size_cap(tmp_path):
+    from journeyman.autonomy.scout import Task
+    from journeyman.autonomy.shift import gather_context
+
+    (tmp_path / "big.py").write_text("x = 1\n" * 5000)
+    task = Task(kind="ai_review", title="t", detail="", where="big.py:1", priority=80)
+    assert len(gather_context(tmp_path, task, limit_chars=2000)) <= 2000

@@ -97,7 +97,7 @@ def _oracle(case_dir: Path, tree: Path) -> tuple[bool, str]:
 
 
 def run_case(case_dir: Path, workdir: Path, feedback_rounds: int,
-             budget: Budget) -> CaseResult:
+             budget: Budget, pregather: bool = False) -> CaseResult:
     meta = json.loads((case_dir / "case.json").read_text(encoding="utf8"))
     res = CaseResult(case=case_dir.name, kind=meta["kind"])
     repo = _materialise(case_dir, workdir)
@@ -113,7 +113,8 @@ def run_case(case_dir: Path, workdir: Path, feedback_rounds: int,
     started = time.time()
     try:
         shift = work_one(repo, task=tasks[0], budget=budget,
-                         max_feedback_rounds=feedback_rounds, keep_worktree=True)
+                         max_feedback_rounds=feedback_rounds, keep_worktree=True,
+                         pregather=pregather)
     except Exception as exc:  # the benchmark must finish even if a shift explodes
         res.error = f"{type(exc).__name__}: {exc}"
         res.minutes = round((time.time() - started) / 60, 2)
@@ -138,7 +139,8 @@ def run_case(case_dir: Path, workdir: Path, feedback_rounds: int,
 
 
 def run(cases_dir: Path = DEFAULT_CASES, only: list[str] | None = None,
-        feedback_rounds: int = 2, budget_factory=None, on_case=None) -> dict:
+        feedback_rounds: int = 2, budget_factory=None, on_case=None,
+        pregather: bool = False) -> dict:
     cases = sorted(d for d in cases_dir.iterdir() if (d / "case.json").exists())
     if only:
         cases = [c for c in cases if c.name in only]
@@ -147,7 +149,7 @@ def run(cases_dir: Path = DEFAULT_CASES, only: list[str] | None = None,
     with tempfile.TemporaryDirectory(prefix="journeyman-bench-") as tmp:
         for case in cases:
             budget = budget_factory() if budget_factory else Budget(max_minutes=10)
-            r = run_case(case, Path(tmp), feedback_rounds, budget)
+            r = run_case(case, Path(tmp), feedback_rounds, budget, pregather)
             results.append(r)
             if on_case:
                 on_case(r)
@@ -158,6 +160,7 @@ def run(cases_dir: Path = DEFAULT_CASES, only: list[str] | None = None,
         "cases": len(results),
         "errors": len(results) - len(scored),
         "feedback_rounds": feedback_rounds,
+        "pregather": pregather,
         "delivered": sum(r.delivered for r in scored),
         "correct": sum(r.correct for r in scored),
         "gamed": sum(r.gamed for r in scored),
@@ -188,7 +191,8 @@ def render(summary: dict) -> str:
         "",
         f"  {s['correct']}/{s['cases'] - s['errors']} correct   "
         f"{s['delivered']} delivered   {s['gamed']} gamed   {s['withheld']} withheld"
-        f"   (feedback rounds: {s['feedback_rounds']}, {s['minutes']} min)",
+        f"   (feedback {s['feedback_rounds']}, pregather {'on' if s.get('pregather') else 'off'}, "
+        f"{s['minutes']} min)",
     ]
     if s["gamed"]:
         lines.append(f"  {s['gamed_and_flagged']} of {s['gamed']} gamed fixes were flagged "
