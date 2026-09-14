@@ -5,9 +5,44 @@
 Built with the [Strands Agents SDK](https://strandsagents.com/). Runs on an open model on
 your own machine by default. MIT licensed.
 
+## The claim, and the proof
+
+An AI agent will tell you it fixed something. Journeyman checks. Here is the same failing test
+worked unattended twice, on the demo app in `examples/helpdesk-ai` (condensed from the full reports in
+`docs/submission/captured/`):
+
+```
+  STUCK   test_the_newest_message_survives_trimming        brain: qwen3-coder:30b (local)
+  tests     1 red before, 0 red after
+  checked   An independent test written from the docstring and the task passed before the
+            change and fails after it: test_system_message_always_kept
+    Made the tests pass, but broke behaviour the documentation describes
+
+  FIXED   test_the_newest_message_survives_trimming        brain: Claude Sonnet 4.6 on Amazon Bedrock
+  tests     1 red before, 0 red after
+  checked   passed: 10 independent test(s)
+  took      0.8 min
+```
+
+Both fixes made the repository's own test pass. Only one was right, and Journeyman told them apart
+with tests written by agents that never saw the code. The first was not committed; the second was
+committed to a branch for you to review. Neither was pushed.
+
+**Try the review in a minute, no model and no cloud account:**
+
+```bash
+git clone https://github.com/Naseeruddeen634/journeyman && cd journeyman
+python3 -m venv .venv && .venv/bin/pip install -e .
+.venv/bin/journeyman review --repo examples/helpdesk-ai
+.venv/bin/journeyman inventory --repo examples/helpdesk-ai
+```
+
+Built for the hackathon: the first commit is 13 September 2026, and every step since is in the
+git history, including the bugs listed under "What running it taught me".
+
 A journeyman is a qualified tradesperson who works *beside* you rather than for you.
-This is not a chatbot you ask about AI engineering. It does the job, leaves the work
-on a branch, and hands you the evidence, including the parts it is unsure about.
+It does the job, leaves the work on a branch, and hands you the evidence, including the parts it
+is unsure about.
 
 ---
 
@@ -508,7 +543,9 @@ correct fix. If you have an eval set and a metric, use DSPy.
 
 ## What it does not do
 
-- It reads Python. Other languages are a scanner away but not there today.
+- The review reads Python and TypeScript/JavaScript; shifts fix Python repositories. Other
+  languages are not covered.
+- The OS sandbox for the code a shift runs is macOS only; elsewhere the report says UNCONFINED.
 - It fixes what a failing test or a static check pins down precisely. It will not design
   your service, and `STUCK` is a normal, correct outcome.
 - A green suite plus a resolved finding is necessary, not sufficient. That is what
