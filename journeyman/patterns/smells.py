@@ -760,6 +760,25 @@ def review(repo: str | Path, on_check_error=None) -> list[Finding]:
                 if on_check_error is not None:
                     on_check_error(check.__name__, rel, exc)
 
+    # TypeScript and JavaScript: same codes, a lexer instead of the AST.
+    from .smells_ts import TS_SUFFIXES, check_file as check_ts
+
+    patterns = ignore_patterns(repo)
+    for path in repo.rglob("*"):
+        if path.suffix not in TS_SUFFIXES or path.name.endswith(".d.ts") or not path.is_file():
+            continue
+        if _skipped(path, repo):
+            continue
+        rel = str(path.relative_to(repo))
+        if patterns and is_ignored(rel, patterns):
+            continue
+        try:
+            findings.extend(check_ts(rel, path.read_text(encoding="utf8", errors="ignore")))
+        except Exception as exc:
+            errors.append(("check_ts", rel, f"{type(exc).__name__}: {exc}"))
+            if on_check_error is not None:
+                on_check_error("check_ts", rel, exc)
+
     findings.extend(check_prompt_without_eval(repo))
 
     if errors and on_check_error is None:
