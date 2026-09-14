@@ -21,8 +21,9 @@ from pathlib import Path
 from strands import Agent, tool
 
 from ..brain.models import check as brain_check
+from ..brain.models import LOCAL_MODEL
 from ..brain.models import pick as pick_brain
-from .guardrails import Budget, Refused, Sandbox, close_sandbox, open_sandbox
+from .guardrails import Budget, BudgetGuard, Refused, Sandbox, close_sandbox, open_sandbox
 from .scout import Task, describe, survey
 
 SYSTEM = """You are an engineer working a night shift on a colleague's repository.
@@ -128,6 +129,7 @@ class ShiftResult:
     summary: str = ""
     outcome: str = "no_work"     # fixed | fixed_with_concerns | stuck | regressed | refused | no_work | error
     concerns: list[str] = field(default_factory=list)
+    stopped_by: str = ""
     failures_before: list[str] = field(default_factory=list)
     failures_after: list[str] = field(default_factory=list)
     new_failures: list[str] = field(default_factory=list)
@@ -146,6 +148,7 @@ class ShiftResult:
             "branch": self.branch, "outcome": self.outcome, "green": self.green,
             "files_changed": self.files_changed, "commit": self.commit,
             "summary": self.summary, "brain": self.brain, "concerns": self.concerns,
+            "stopped_by": self.stopped_by,
             "failures_before": self.failures_before, "failures_after": self.failures_after,
             "new_failures": self.new_failures, "fixed_failures": self.fixed_failures,
             "minutes": self.minutes, "budget": self.budget,
@@ -333,12 +336,15 @@ def work_one(repo: str | Path, task: Task | None = None, budget: Budget | None =
     if task.evidence:
         brief += f"\nEvidence:\n{task.evidence[:2500]}\n"
 
+    # A local model is free; anything else is metered against max_heavy_calls.
+    guard = BudgetGuard(budget, paid=(name != LOCAL_MODEL))
     agent = Agent(
         name="journeyman-night-shift",
         system_prompt=SYSTEM,
         tools=_tools_for(sandbox, result),
         model=model,
         callback_handler=None,
+        hooks=[guard],
     )
 
     try:
@@ -349,6 +355,8 @@ def work_one(repo: str | Path, task: Task | None = None, budget: Budget | None =
     except Exception as exc:
         result.outcome = "error"
         result.summary = f"{type(exc).__name__}: {exc}"
+
+    result.stopped_by = guard.stopped_by
 
     # ---- verify for ourselves. The agent's own claim is not evidence. ----
     after, after_out = failing_set(sandbox.root)
@@ -434,10 +442,13 @@ def report(result: ShiftResult) -> str:
     else:
         lines.append("  tests     green before and after")
     lines.append(f"  took      {result.minutes} min")
+    if result.stopped_by:
+        lines.append(f"  STOPPED   {result.stopped_by}")
     if result.budget:
         b = result.budget
-        lines.append(f"  budget    {b['commands_run']}/{b['max_commands']} commands, "
-                     f"{b['heavy_calls']}/{b['max_heavy_calls']} heavy calls")
+        lines.append(f"  budget    {b['iterations']}/{b['max_iterations']} turns, "
+                     f"{b['commands_run']}/{b['max_commands']} commands, "
+                     f"{b['heavy_calls']}/{b['max_heavy_calls']} paid calls")
     lines.append("")
     if result.files_changed:
         lines.append("  changed:")

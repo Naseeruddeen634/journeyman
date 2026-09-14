@@ -224,3 +224,69 @@ def close_sandbox(repo: Path, sandbox: Sandbox, keep: bool = True) -> None:
         return
     subprocess.run(["git", "worktree", "remove", "--force", str(sandbox.root)],
                    cwd=Path(repo).resolve(), capture_output=True, text=True)
+
+
+class BudgetGuard:
+    """Enforces the time, turn and paid-call budgets inside the agent loop.
+
+    The first version of this file declared max_minutes, max_iterations and
+    max_heavy_calls on Budget and never enforced any of them. The README
+    promised all three. An agent left running overnight with no turn limit is
+    only bounded by the model deciding to stop, which is not a bound.
+
+    This is a Strands HookProvider. Before every model call it counts the turn
+    and checks the clock; when a limit is hit it sets `cancel`, which ends the
+    invocation cleanly with a stop message as the final response. The shift's
+    own verification still runs afterwards, so a budget stop is reported as
+    what it is rather than as a crash.
+    """
+
+    def __init__(self, budget: Budget, paid: bool = False, clock=None) -> None:
+        import time as _time
+
+        self.budget = budget
+        self.paid = paid
+        self._clock = clock or _time.monotonic
+        self.started = self._clock()
+        self.stopped_by: str = ""
+        self.model_calls = 0
+        self.tool_calls = 0
+
+    @property
+    def elapsed_minutes(self) -> float:
+        return (self._clock() - self.started) / 60.0
+
+    def register_hooks(self, registry, **kwargs) -> None:
+        from strands.hooks import BeforeModelCallEvent, BeforeToolCallEvent
+
+        registry.add_callback(BeforeModelCallEvent, self._before_model)
+        registry.add_callback(BeforeToolCallEvent, self._before_tool)
+
+    def _stop(self, why: str) -> str:
+        if not self.stopped_by:
+            self.stopped_by = why
+        return f"STUCK: stopped by the budget, {why}. Nothing further was attempted."
+
+    def _before_model(self, event) -> None:
+        if self.stopped_by:
+            event.cancel = self._stop(self.stopped_by)
+            return
+        if self.elapsed_minutes > self.budget.max_minutes:
+            event.cancel = self._stop(f"{self.budget.max_minutes:g} minute limit reached")
+            return
+        try:
+            self.budget.spend_iteration()
+            if self.paid:
+                self.budget.spend_heavy()
+        except Refused as exc:
+            event.cancel = self._stop(str(exc))
+            return
+        self.model_calls += 1
+
+    def _before_tool(self, event) -> None:
+        self.tool_calls += 1
+        if self.stopped_by:
+            event.cancel_tool = f"Refused: {self.stopped_by}"
+        elif self.elapsed_minutes > self.budget.max_minutes:
+            self._stop(f"{self.budget.max_minutes:g} minute limit reached")
+            event.cancel_tool = f"Refused: {self.stopped_by}"
