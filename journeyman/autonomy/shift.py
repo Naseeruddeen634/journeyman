@@ -45,7 +45,12 @@ How to work:
 You cannot push, merge, install packages, or touch anything outside this
 worktree. Do not try; the attempt will be refused and it wastes your budget.
 
-When the tests pass, reply with a one-line summary starting with DONE:.
+If the task is a review finding, it counts as fixed only when that finding no
+longer fires on the file. Use check_my_fix after each edit, and keep going
+until it says the finding is gone. Removing the code that triggers the check
+without fixing the underlying problem is not a fix.
+
+When the work is verified, reply with a one-line summary starting with DONE:.
 If you are giving up, reply with a one-line summary starting with STUCK:.
 """
 
@@ -130,6 +135,8 @@ class ShiftResult:
     outcome: str = "no_work"     # fixed | fixed_with_concerns | stuck | regressed | refused | no_work | error
     concerns: list[str] = field(default_factory=list)
     stopped_by: str = ""
+    finding_resolved: bool | None = None
+    findings_introduced: list[str] = field(default_factory=list)
     failures_before: list[str] = field(default_factory=list)
     failures_after: list[str] = field(default_factory=list)
     new_failures: list[str] = field(default_factory=list)
@@ -149,6 +156,8 @@ class ShiftResult:
             "files_changed": self.files_changed, "commit": self.commit,
             "summary": self.summary, "brain": self.brain, "concerns": self.concerns,
             "stopped_by": self.stopped_by,
+            "finding_resolved": self.finding_resolved,
+            "findings_introduced": self.findings_introduced,
             "failures_before": self.failures_before, "failures_after": self.failures_after,
             "new_failures": self.new_failures, "fixed_failures": self.fixed_failures,
             "minutes": self.minutes, "budget": self.budget,
@@ -181,7 +190,31 @@ def failing_set(repo: Path) -> tuple[set[str], str]:
     return set(FAIL_LINE.findall(out)), out[-2500:]
 
 
-def _tools_for(sandbox: Sandbox, result: ShiftResult):
+def finding_counts(root: Path, file: str) -> dict[str, int]:
+    """How many of each finding code sit in one file, right now."""
+    from ..patterns.smells import review
+
+    counts: dict[str, int] = {}
+    for f in review(root):
+        if f.where.split(":")[0] == file:
+            counts[f.code] = counts.get(f.code, 0) + 1
+    return counts
+
+
+def resolution(code: str, before: dict[str, int], after: dict[str, int]) -> tuple[bool, list[str]]:
+    """Did the change remove the finding it was sent for, and add any new ones?
+
+    Matched on code and file rather than line, because a fix moves lines.
+    An earlier version never asked this at all: a review task was marked FIXED
+    whenever something changed and no test broke, including a run where the
+    agent wrapped the input in backticks and AIE004 still fired on the line.
+    """
+    resolved = after.get(code, 0) < before.get(code, 0)
+    introduced = sorted(c for c, n in after.items() if n > before.get(c, 0))
+    return resolved, introduced
+
+
+def _tools_for(sandbox: Sandbox, result: ShiftResult, task: Task | None = None):
     """Tools bound to one sandbox. Every path goes through the guardrail."""
 
     @tool
@@ -284,7 +317,40 @@ def _tools_for(sandbox: Sandbox, result: ShiftResult):
             return f"Refused: {exc}"
         return (r.stdout or "(no changes yet)")[:6000]
 
-    return [read_file, write_file, list_files, run_tests, show_diff]
+    tools = [read_file, write_file, list_files, run_tests, show_diff]
+
+    if task is not None and task.kind == "ai_review" and task.meta.get("code"):
+        code = task.meta["code"]
+        target = task.where.split(":")[0]
+
+        @tool
+        def check_my_fix() -> str:
+            """Re-run the review on the file you were asked to fix.
+
+            Use this after editing. The shift is only counted as fixed if the
+            finding you were sent for no longer fires, so check before you stop.
+
+            Returns:
+                Whether the finding still fires, and anything new your change introduced.
+            """
+            from ..patterns.smells import review
+
+            here = [f for f in review(sandbox.root) if f.where.split(":")[0] == target]
+            still = [f for f in here if f.code == code]
+            others = sorted({f.code for f in here if f.code != code})
+            if still:
+                lines = [f"{code} still fires on {target}:"]
+                lines += [f"  line {f.where.rsplit(':', 1)[-1]}: {f.evidence or f.title}"
+                          for f in still[:3]]
+                lines.append(f"What resolves it: {still[0].fix}")
+                return "\n".join(lines)
+            msg = f"{code} no longer fires on {target}."
+            if others:
+                msg += f" Other findings in the file: {', '.join(others)}."
+            return msg
+
+        tools.append(check_my_fix)
+    return tools
 
 
 def work_one(repo: str | Path, task: Task | None = None, budget: Budget | None = None,
@@ -327,6 +393,10 @@ def work_one(repo: str | Path, task: Task | None = None, budget: Budget | None =
     result.failures_before = sorted(before)
     result.tests_before = before_out
 
+    review_file = task.where.split(":")[0]
+    review_code = task.meta.get("code", "")
+    findings_before = finding_counts(sandbox.root, review_file) if task.kind == "ai_review" else {}
+
     brief = (
         f"TASK ({task.kind}, priority {task.priority})\n"
         f"{task.title}\n\n"
@@ -341,7 +411,7 @@ def work_one(repo: str | Path, task: Task | None = None, budget: Budget | None =
     agent = Agent(
         name="journeyman-night-shift",
         system_prompt=SYSTEM,
-        tools=_tools_for(sandbox, result),
+        tools=_tools_for(sandbox, result, task),
         model=model,
         callback_handler=None,
         hooks=[guard],
@@ -375,6 +445,15 @@ def work_one(repo: str | Path, task: Task | None = None, budget: Budget | None =
         result.summary, result.diff
     )
 
+    if task.kind == "ai_review" and review_code:
+        findings_after = finding_counts(sandbox.root, review_file)
+        result.finding_resolved, result.findings_introduced = resolution(
+            review_code, findings_before, findings_after)
+        if result.findings_introduced:
+            result.concerns.append(
+                "The change introduced new review findings in the same file: "
+                + ", ".join(result.findings_introduced))
+
     if result.outcome not in ("refused", "error"):
         if result.new_failures:
             # Broke something that was working. Nothing else matters.
@@ -389,6 +468,12 @@ def work_one(repo: str | Path, task: Task | None = None, budget: Budget | None =
         elif task.kind == "failing_test" and not result.fixed_failures:
             # It was sent to fix a red test and the test is still red.
             result.outcome = "stuck"
+        elif task.kind == "ai_review" and result.finding_resolved is False:
+            # Changed something, but the thing it was sent for is still there.
+            result.outcome = "stuck"
+            result.summary = (
+                f"Changed {', '.join(result.files_changed[:2])} but {review_code} still "
+                f"fires on {review_file}. Not committed.\n" + (result.summary or ""))
         else:
             # Changed something, broke nothing. If it hedged, say so loudly.
             result.outcome = "fixed_with_concerns" if result.concerns else "fixed"
@@ -444,6 +529,10 @@ def report(result: ShiftResult) -> str:
     lines.append(f"  took      {result.minutes} min")
     if result.stopped_by:
         lines.append(f"  STOPPED   {result.stopped_by}")
+    if result.finding_resolved is not None:
+        lines.append(f"  finding   {'resolved' if result.finding_resolved else 'STILL THERE'}"
+                     + (f", introduced {', '.join(result.findings_introduced)}"
+                        if result.findings_introduced else ""))
     if result.budget:
         b = result.budget
         lines.append(f"  budget    {b['iterations']}/{b['max_iterations']} turns, "
