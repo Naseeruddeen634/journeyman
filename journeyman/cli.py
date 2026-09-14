@@ -454,7 +454,7 @@ def _eval(args) -> int:
             cases = parse_synthesized(call(SYNTH_PROMPT.format(n=args.synthesize, prompt=ev.prompt())))
             print(f"  synthesized {len(cases)} usable case(s)" if cases
                   else "  synthesis produced nothing usable; writing starter cases instead")
-        ev = scaffold(repo, prompt_path, cases or None, overwrite=args.overwrite)
+        ev = scaffold(repo, prompt_path, cases or None, overwrite=args.overwrite, runner=args.runner)
         print(f"\n  cases     {ev.cases_file}")
         print(f"  test      {ev.test_file}")
         if not cases:
@@ -627,6 +627,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="ask the model for N cases instead of starter placeholders")
     ev.add_argument("--record", action="store_true", help="call the model and record responses")
     ev.add_argument("--overwrite", action="store_true")
+    ev.add_argument("--runner", choices=["auto", "pytest", "vitest"], default="auto",
+                    help="test file to generate; auto picks vitest for a TypeScript project using it")
     ev.set_defaults(func=_eval)
 
     po = sub.add_parser("propose", help="write the PR description for a delivered shift")

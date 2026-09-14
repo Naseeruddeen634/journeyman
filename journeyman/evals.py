@@ -294,15 +294,136 @@ def test_{name}_eval_does_not_regress():
 '''
 
 
+# The same replay and the same graders, for a TypeScript codebase that runs Vitest.
+# Recording stays with `journeyman eval --record`; this only reads what was recorded.
+# Kept in step with grade() and _key() by a test that runs both on the same inputs.
+VITEST_TEMPLATE = """// Eval for {prompt_rel}. Written by Journeyman.
+//
+// Replays recorded model responses: no network, no cost, no flakiness. Re-record
+// after changing the prompt or the model:
+//
+//     journeyman eval {prompt_rel} --record
+//
+// Fails when the held-out score drops below the recorded baseline, or when a case
+// has no recorded response (a new case, or a prompt edit that changed every key).
+
+import {{ createHash }} from "node:crypto";
+import {{ existsSync, readFileSync }} from "node:fs";
+import {{ join }} from "node:path";
+import {{ describe, expect, it }} from "vitest";
+
+const ROOT = join(__dirname, "..");
+const DIR = join(ROOT, "evals", "{name}");
+const TOLERANCE = 0;
+
+type Expect = {{ type?: string; value?: unknown }};
+type Case = {{ id: string; input: string; expect: Expect; split?: string }};
+
+// Python reads the prompt with universal newlines, so the key is over \\n line endings.
+const text = (path: string) => readFileSync(path, "utf8").replace(/\\r\\n?/g, "\\n");
+
+export function key(prompt: string, value: string, model: string): string {{
+  return createHash("sha256").update(`${{model}}\\u0000${{prompt}}\\u0000${{value}}`, "utf8").digest("hex").slice(0, 16);
+}}
+
+const FENCE = /^\\s*```(?:json)?\\s*([\\s\\S]*?)\\s*```\\s*$/;
+
+export function grade(output: string, expect: Expect): boolean {{
+  const kind = expect.type ?? "contains";
+  const value = expect.value;
+  const out = (output ?? "").trim();
+  switch (kind) {{
+    case "exact":
+      return out.toLowerCase() === String(value).trim().toLowerCase();
+    case "contains":
+      return out.toLowerCase().includes(String(value).toLowerCase());
+    case "not_contains":
+      return !out.toLowerCase().includes(String(value).toLowerCase());
+    case "one_of":
+      return (value as unknown[]).map((v) => String(v).toLowerCase())
+        .includes(out.toLowerCase().replace(/^[ .]+|[ .]+$/g, ""));
+    case "regex":
+      return new RegExp(String(value).replace(/\\(\\?P</g, "(?<"), "is").test(out);
+    case "json_keys": {{
+      const m = FENCE.exec(out);
+      try {{
+        const data = JSON.parse(m ? m[1] : out);
+        return data !== null && typeof data === "object" && !Array.isArray(data)
+          && (value as string[]).every((k) => Object.prototype.hasOwnProperty.call(data, k));
+      }} catch {{
+        return false;
+      }}
+    }}
+    case "max_words":
+      return out.split(/\\s+/).filter(Boolean).length <= Number(value);
+    default:
+      throw new Error(`unknown expectation type ${{kind}}`);
+  }}
+}}
+
+describe("{name} eval", () => {{
+  it("does not regress", () => {{
+    const prompt = text(join(ROOT, "{prompt_rel}"));
+    const cases: Case[] = text(join(DIR, "cases.jsonl")).split("\\n").filter((l) => l.trim()).map((l) => JSON.parse(l));
+    const cassette = existsSync(join(DIR, "cassette.json")) ? JSON.parse(text(join(DIR, "cassette.json"))) : {{ model: "", responses: {{}} }};
+    const model = cassette.model || "unrecorded";
+    const right: Record<string, number> = {{}};
+    const count: Record<string, number> = {{}};
+    const unrecorded: string[] = [];
+    const failures: string[] = [];
+    for (const c of cases) {{
+      const response = cassette.responses?.[key(prompt, c.input, model)];
+      if (response === undefined) {{ unrecorded.push(c.id); continue; }}
+      const split = c.split ?? "train";
+      count[split] = (count[split] ?? 0) + 1;
+      const ok = grade(response, c.expect);
+      right[split] = (right[split] ?? 0) + (ok ? 1 : 0);
+      if (!ok) failures.push(c.id);
+    }}
+    expect(unrecorded, "no recorded response; run: journeyman eval {prompt_rel} --record").toEqual([]);
+    const baseline = JSON.parse(text(join(DIR, "baseline.json"))).scores as Record<string, number>;
+    for (const split of ["holdout", "train"]) {{
+      if (baseline[split] === undefined || !count[split]) continue;
+      const score = Math.round((right[split] / count[split]) * 10000) / 10000;
+      expect(score, `${{split}} dropped from ${{baseline[split]}} to ${{score}}; failing: ${{failures.slice(0, 3)}}`)
+        .toBeGreaterThanOrEqual(baseline[split] - TOLERANCE);
+    }}
+  }});
+}});
+"""
+
+
+def eval_test_runner(repo: Path) -> str:
+    """pytest for a Python project, vitest for a TypeScript one that already uses Vitest."""
+    repo = Path(repo)
+    if any((repo / f).exists() for f in ("pyproject.toml", "setup.py", "setup.cfg", "requirements.txt")):
+        return "pytest"
+    pkg = repo / "package.json"
+    if pkg.exists():
+        try:
+            data = json.loads(pkg.read_text(encoding="utf8"))
+        except json.JSONDecodeError:
+            return "pytest"
+        if "vitest" in {**data.get("dependencies", {}), **data.get("devDependencies", {})}:
+            return "vitest"
+    return "pytest"
+
+
 def scaffold(repo: Path, prompt_path: Path, cases: list[Case] | None = None,
-             overwrite: bool = False) -> EvalDir:
+             overwrite: bool = False, runner: str = "auto") -> EvalDir:
     ev = EvalDir(repo, prompt_path)
+    runner = eval_test_runner(ev.repo) if runner == "auto" else runner
+    if runner not in ("pytest", "vitest"):
+        raise ValueError(f"no eval test template for {runner!r}; pytest and vitest are supported")
+    if runner == "vitest":
+        ev.test_file = ev.repo / "tests" / f"{ev.name}.eval.test.ts"
     if ev.cases_file.exists() and not overwrite:
         return ev
     ev.write_cases(cases or starter_cases(ev.prompt()))
     ev.test_file.parent.mkdir(parents=True, exist_ok=True)
-    rel = str(ev.prompt_path.relative_to(ev.repo))
-    ev.test_file.write_text(TEST_TEMPLATE.format(prompt_rel=rel, name=ev.name), encoding="utf8")
+    rel = ev.prompt_path.relative_to(ev.repo).as_posix()
+    template = VITEST_TEMPLATE if runner == "vitest" else TEST_TEMPLATE
+    ev.test_file.write_text(template.format(prompt_rel=rel, name=ev.name), encoding="utf8")
     return ev
 
 
