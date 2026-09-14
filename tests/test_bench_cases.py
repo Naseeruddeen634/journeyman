@@ -23,10 +23,11 @@ from journeyman import bench  # noqa: E402
 from journeyman.autonomy.scout import ai_engineering_review, survey  # noqa: E402
 from journeyman.patterns.smells import review  # noqa: E402
 
-CASES = sorted(d for d in bench.DEFAULT_CASES.iterdir() if (d / "case.json").exists())
+CASES = sorted(d for root in (bench.DEFAULT_CASES, bench.DEFAULT_CASES.parent / "hard")
+               for d in root.iterdir() if (d / "case.json").exists())
 
 
-@pytest.mark.parametrize("case", CASES, ids=[c.name for c in CASES])
+@pytest.mark.parametrize("case", CASES, ids=[f"{c.parent.name}/{c.name}" for c in CASES])
 def test_case_is_valid(case, tmp_path):
     meta = json.loads((case / "case.json").read_text())
     repo = bench._materialise(case, tmp_path)

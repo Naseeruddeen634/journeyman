@@ -1,0 +1,1 @@
+{"kind": "failing_test", "title": "cosine similarity uses the wrong normaliser and crashes on zero vectors", "difficulty": "hard"}

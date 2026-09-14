@@ -1,0 +1,1 @@
+{"kind": "failing_test", "title": "context trimming drops the newest messages and the system prompt", "difficulty": "hard"}

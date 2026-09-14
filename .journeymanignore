@@ -1,2 +1,3 @@
 # Benchmark cases are broken on purpose. They are what the agent is measured on.
 bench/cases/
+bench/hard/
