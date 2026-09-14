@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from journeyman.compare import compare, mcnemar_exact, render_report, smallest_detectable
+from journeyman.compare import compare, mcnemar_exact, parse_spec, render_report, smallest_detectable
 from journeyman.evals import Case, EvalDir, scaffold
 
 PROMPT = "Classify the sentiment of this review as positive or negative.\n\n{review}\n"
@@ -115,3 +115,13 @@ def test_two_samples_that_disagree_are_not_a_pass(tmp_path):
 def test_comparing_a_model_with_itself_is_refused(tmp_path):
     with pytest.raises(ValueError):
         compare(make_eval(tmp_path), "a", "a", {"a": oracle})
+
+
+def test_model_specs():
+    assert parse_spec("ollama:qwen3-coder:30b") == ("local", "qwen3-coder:30b")
+    assert parse_spec("openrouter:moonshotai/kimi-k3") == ("heavy", "moonshotai/kimi-k3")
+    assert parse_spec("bedrock:global.anthropic.claude-sonnet-4-6") == ("bedrock", "global.anthropic.claude-sonnet-4-6")
+    assert parse_spec("local") == ("local", "")
+    for bad in ("gpt-4o", "ollama:", "azure:gpt"):
+        with pytest.raises(ValueError):
+            parse_spec(bad)

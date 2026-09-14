@@ -34,6 +34,21 @@ from .evals import EvalDir, _key, grade, render
 
 ALPHA = 0.05
 SENSITIVE = ("inject", "adversarial", "jailbreak", "pii", "safety")
+PROVIDERS = {"ollama": "local", "local": "local", "openrouter": "heavy", "heavy": "heavy",
+             "kimi": "heavy", "bedrock": "bedrock"}
+
+
+def parse_spec(spec: str) -> tuple[str, str]:
+    """"ollama:qwen3-coder:30b" -> ("local", "qwen3-coder:30b"). A bare brain name keeps its
+    configured model: "local" -> ("local", "")."""
+    head, sep, rest = spec.partition(":")
+    kind = PROVIDERS.get(head.lower())
+    if kind is None:
+        raise ValueError(f"unknown model spec {spec!r}: use ollama:<model>, openrouter:<model>, "
+                         "bedrock:<model id>, or local / heavy / bedrock for the configured default")
+    if sep and not rest:
+        raise ValueError(f"model spec {spec!r} names a provider but no model")
+    return kind, rest
 
 
 def mcnemar_exact(b: int, c: int) -> float:
