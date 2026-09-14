@@ -367,12 +367,13 @@ def _bench(args) -> int:
 
     cases = Path(args.cases) if args.cases else bench.DEFAULT_CASES
     print(f"\n  Journeyman bench   {cases}   feedback rounds: {args.feedback}   "
-          f"pregather: {'on' if args.pregather else 'off'}\n", flush=True)
+          f"pregather: {'on' if args.pregather else 'off'}   "
+          f"spec check: {'on' if args.spec_check else 'off'}\n", flush=True)
     summary = bench.run(
         cases, only=args.only, feedback_rounds=args.feedback,
         budget_factory=lambda: Budget(max_minutes=args.max_minutes,
                                       max_iterations=args.max_iterations),
-        pregather=args.pregather,
+        pregather=args.pregather, spec_check=args.spec_check,
         on_case=lambda r: print(f"  {r.case:<20} {r.outcome or 'error':<21} "
                                 f"oracle {'pass' if r.oracle_passed else 'fail'}  "
                                 f"{r.minutes} min", flush=True),
@@ -382,7 +383,8 @@ def _bench(args) -> int:
     out = HOME / "bench"
     out.mkdir(exist_ok=True)
     stamp = __import__("time").strftime("%Y%m%d-%H%M%S")
-    path = out / f"{stamp}-fb{args.feedback}{'-ctx' if args.pregather else ''}.json"
+    path = out / (f"{stamp}-fb{args.feedback}{'-ctx' if args.pregather else ''}"
+                  f"{'-spec' if args.spec_check else ''}.json")
     path.write_text(json.dumps(summary, indent=2, default=str), encoding="utf8")
     print(f"  {path}\n")
     return 0
@@ -666,6 +668,8 @@ def main(argv: list[str] | None = None) -> int:
     bn.add_argument("--max-minutes", type=float, default=10.0)
     bn.add_argument("--max-iterations", type=int, default=20)
     bn.add_argument("--pregather", action="store_true", help="hand the agent relevant files up front")
+    bn.add_argument("--spec-check", action="store_true",
+                    help="independent tests from the docstring and task must pass too")
     bn.set_defaults(func=_bench)
 
     br = sub.add_parser("brain", help="which models are available")

@@ -132,7 +132,7 @@ class Sandbox:
 
     # Build noise the agent did not write and should not be judged on.
     NOISE = ("__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache",
-             ".DS_Store", ".journeyman/")
+             ".DS_Store", ".journeyman/", "_journeyman_spec_test.py")
 
     def changed_files(self) -> list[str]:
         """Files the agent actually changed, excluding build noise.

@@ -45,14 +45,34 @@ How to work:
 You cannot push, merge, install packages, or touch anything outside this
 worktree. Do not try; the attempt will be refused and it wastes your budget.
 
+When the work is verified, reply with a one-line summary starting with DONE:.
+If you are giving up, reply with a one-line summary starting with STUCK:.
+"""
+
+# Only review tasks have check_my_fix. When this paragraph was in SYSTEM for every
+# task, the agent called check_my_fix on failing-test tasks, got "tool not found",
+# and spent a turn on it: three times in one 12-case benchmark run.
+REVIEW_RULES = """
 If the task is a review finding, it counts as fixed only when that finding no
 longer fires on the file. Use check_my_fix after each edit, and keep going
 until it says the finding is gone. Removing the code that triggers the check
 without fixing the underlying problem is not a fix.
-
-When the work is verified, reply with a one-line summary starting with DONE:.
-If you are giving up, reply with a one-line summary starting with STUCK:.
 """
+
+
+def system_prompt_for(task: Task) -> str:
+    return SYSTEM + (REVIEW_RULES if task.kind == "ai_review" else "")
+
+
+def checker_brain(worker_model_name: str):
+    """The same brain the worker has, sampled hotter, so two checks are independent draws."""
+    from ..brain import models
+
+    if worker_model_name == models.HEAVY_MODEL:
+        return models.heavy_brain(temperature=0.7)
+    if worker_model_name == models.BEDROCK_MODEL:
+        return models.bedrock_brain(temperature=0.7)
+    return models.local_brain(temperature=0.7)
 
 
 # Hedges an engineer uses when they know the change is not quite right. A green
@@ -166,6 +186,7 @@ class ShiftResult:
     confined: bool | None = None
     feedback_rounds: int = 0
     feedback: list[str] = field(default_factory=list)
+    spec_check: str = ""         # what the independent check concluded, "" when it did not run
     finding_resolved: bool | None = None
     findings_introduced: list[str] = field(default_factory=list)
     failures_before: list[str] = field(default_factory=list)
@@ -188,6 +209,7 @@ class ShiftResult:
             "summary": self.summary, "brain": self.brain, "concerns": self.concerns,
             "stopped_by": self.stopped_by, "confined": self.confined,
             "feedback_rounds": self.feedback_rounds, "feedback": self.feedback,
+            "spec_check": self.spec_check,
             "finding_resolved": self.finding_resolved,
             "findings_introduced": self.findings_introduced,
             "failures_before": self.failures_before, "failures_after": self.failures_after,
@@ -514,7 +536,8 @@ def _tools_for(sandbox: Sandbox, result: ShiftResult, task: Task | None = None):
 
 def work_one(repo: str | Path, task: Task | None = None, budget: Budget | None = None,
              difficulty: str = "routine", keep_worktree: bool = True,
-             max_feedback_rounds: int = 2, pregather: bool = False) -> ShiftResult:
+             max_feedback_rounds: int = 2, pregather: bool = False,
+             spec_check: bool = False) -> ShiftResult:
     """Do one task, end to end, unattended."""
     repo = Path(repo).resolve()
     budget = budget or Budget()
@@ -575,7 +598,7 @@ def work_one(repo: str | Path, task: Task | None = None, budget: Budget | None =
     guard = BudgetGuard(budget, paid=(name != LOCAL_MODEL))
     agent = Agent(
         name="journeyman-night-shift",
-        system_prompt=SYSTEM,
+        system_prompt=system_prompt_for(task),
         tools=_tools_for(sandbox, result, task),
         model=model,
         callback_handler=None,
@@ -595,6 +618,27 @@ def work_one(repo: str | Path, task: Task | None = None, budget: Budget | None =
     watchdog = threading.Timer(budget.max_minutes * 60, _overtime)
     watchdog.daemon = True
     watchdog.start()
+    from . import spec_check as _spec
+
+    spec_codes: list[str] | None = None
+
+    def independent_checks() -> list[str]:
+        """Written once, from the task and the pre-change docstrings, by fresh contexts."""
+        specs = _spec.changed_functions(sandbox.root, sandbox.changed_files())
+        if not specs:
+            result.spec_check = "not run: no documented function changed"
+            return []
+
+        def ask(text: str) -> str:
+            checker = Agent(name="journeyman-checker", system_prompt=_spec.CHECKER_SYSTEM,
+                            model=checker_brain(name), callback_handler=None, hooks=[guard])
+            return str(checker(text))
+
+        codes = _spec.write_checks(ask, task.title, task.detail, specs)
+        if len(codes) < 2:
+            result.spec_check = "not run: the checker did not produce two usable test files"
+        return codes
+
     try:
         prompt = brief
         for round_no in range(max_feedback_rounds + 1):
@@ -604,6 +648,13 @@ def work_one(repo: str | Path, task: Task | None = None, budget: Budget | None =
                 break
             ok, feedback = progress_check(sandbox.root, task, before, findings_before,
                                           sandbox.changed_files(), result.summary)
+            if ok and spec_check:
+                if spec_codes is None:
+                    spec_codes = independent_checks()
+                if len(spec_codes) >= 2:
+                    verdict = _spec.judge_all(sandbox.root, spec_codes)
+                    if not verdict.ok:
+                        ok, feedback = False, verdict.feedback()
             if ok:
                 break
             result.feedback_rounds += 1
@@ -652,6 +703,23 @@ def work_one(repo: str | Path, task: Task | None = None, budget: Budget | None =
     violations = check_worktree(sandbox.root, result.files_changed)
     admitted = admits_contract_conflict(result.summary)
 
+    spec_broke = ""
+    if spec_check and result.files_changed and not guard.stopped_by:
+        if spec_codes is None:          # no feedback round ran, so the check has not been written
+            spec_codes = independent_checks()
+        if len(spec_codes) >= 2:
+            final = _spec.judge_all(sandbox.root, spec_codes)
+            if not final.usable:
+                result.spec_check = f"not run: {final.note}"
+            elif final.ok:
+                result.spec_check = f"passed: {final.passed} independent test(s)"
+            else:
+                result.spec_check = final.concern()
+                if final.broke:
+                    spec_broke = final.concern()
+                else:
+                    result.concerns.append(final.concern())
+
     if result.outcome not in ("refused", "error"):
         if result.new_failures:
             # Broke something that was working. Nothing else matters.
@@ -666,6 +734,13 @@ def work_one(repo: str | Path, task: Task | None = None, budget: Budget | None =
         elif task.kind == "failing_test" and not result.fixed_failures:
             # It was sent to fix a red test and the test is still red.
             result.outcome = "stuck"
+        elif spec_broke:
+            # Two independent checks, written without seeing the code, agree that behaviour
+            # which worked before the change no longer does.
+            result.outcome = "stuck"
+            result.concerns.append(spec_broke)
+            result.summary = ("Made the tests pass, but broke behaviour the documentation "
+                              f"describes. Not committed. {spec_broke}\n" + (result.summary or ""))
         elif violations or admitted:
             # The tests went green by deleting what the code promises. Twice a
             # shift did exactly this; once it was delivered. Not any more.
@@ -691,6 +766,7 @@ def work_one(repo: str | Path, task: Task | None = None, budget: Budget | None =
             result.summary = (f"Changed {len(result.files_changed)} files, over the limit of "
                               f"{budget.max_files_changed}. Left uncommitted for review.")
         else:
+            (sandbox.root / _spec.SPEC_FILE).unlink(missing_ok=True)   # never part of the work
             sandbox.run_argv(["git", "add", "-A"])
             msg = f"{task.title[:68]}\n\nWorked unattended by Journeyman on {stamp}.\nTask: {task.kind} at {task.where}\n"
             (sandbox.root / ".git_commit_msg").write_text(msg, encoding="utf8")

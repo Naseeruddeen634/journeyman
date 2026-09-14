@@ -50,6 +50,7 @@ class CaseResult:
     error: str = ""
     summary: str = ""
     diff: str = ""
+    spec_check: str = ""
 
     @property
     def correct(self) -> bool:
@@ -100,7 +101,7 @@ def _oracle(case_dir: Path, tree: Path) -> tuple[bool, str]:
 
 
 def run_case(case_dir: Path, workdir: Path, feedback_rounds: int,
-             budget: Budget, pregather: bool = False) -> CaseResult:
+             budget: Budget, pregather: bool = False, spec_check: bool = False) -> CaseResult:
     meta = json.loads((case_dir / "case.json").read_text(encoding="utf8"))
     res = CaseResult(case=case_dir.name, kind=meta["kind"])
     repo = _materialise(case_dir, workdir)
@@ -113,14 +114,14 @@ def run_case(case_dir: Path, workdir: Path, feedback_rounds: int,
         res.error = "the case did not produce its task; the case is broken, not the agent"
         return res
 
-    started = time.time()
+    started = time.monotonic()      # not wall time: a laptop that sleeps mid-case once read 214 minutes
     try:
         shift = work_one(repo, task=tasks[0], budget=budget,
                          max_feedback_rounds=feedback_rounds, keep_worktree=True,
-                         pregather=pregather)
+                         pregather=pregather, spec_check=spec_check)
     except Exception as exc:  # the benchmark must finish even if a shift explodes
         res.error = f"{type(exc).__name__}: {exc}"
-        res.minutes = round((time.time() - started) / 60, 2)
+        res.minutes = round((time.monotonic() - started) / 60, 2)
         return res
 
     res.outcome = shift.outcome
@@ -128,10 +129,11 @@ def run_case(case_dir: Path, workdir: Path, feedback_rounds: int,
     res.concerns = len(shift.concerns)
     res.feedback_rounds = shift.feedback_rounds
     res.turns = shift.budget.get("iterations", 0) if shift.budget else 0
-    res.minutes = round((time.time() - started) / 60, 2)
+    res.minutes = round((time.monotonic() - started) / 60, 2)
     res.stopped_by = shift.stopped_by
     res.summary = shift.summary[-300:]
     res.diff = shift.diff[:3000]
+    res.spec_check = shift.spec_check
 
     tree = repo / ".journeyman" / "worktrees" / shift.branch.replace("/", "-")
     if tree.exists():
@@ -143,7 +145,7 @@ def run_case(case_dir: Path, workdir: Path, feedback_rounds: int,
 
 def run(cases_dir: Path = DEFAULT_CASES, only: list[str] | None = None,
         feedback_rounds: int = 2, budget_factory=None, on_case=None,
-        pregather: bool = False) -> dict:
+        pregather: bool = False, spec_check: bool = False) -> dict:
     cases = sorted(d for d in cases_dir.iterdir() if (d / "case.json").exists())
     if only:
         cases = [c for c in cases if c.name in only]
@@ -152,7 +154,7 @@ def run(cases_dir: Path = DEFAULT_CASES, only: list[str] | None = None,
     with tempfile.TemporaryDirectory(prefix="journeyman-bench-") as tmp:
         for case in cases:
             budget = budget_factory() if budget_factory else Budget(max_minutes=10)
-            r = run_case(case, Path(tmp), feedback_rounds, budget, pregather)
+            r = run_case(case, Path(tmp), feedback_rounds, budget, pregather, spec_check)
             results.append(r)
             if on_case:
                 on_case(r)
@@ -164,6 +166,7 @@ def run(cases_dir: Path = DEFAULT_CASES, only: list[str] | None = None,
         "errors": len(results) - len(scored),
         "feedback_rounds": feedback_rounds,
         "pregather": pregather,
+        "spec_check": spec_check,
         "delivered": sum(r.delivered for r in scored),
         "correct": sum(r.correct for r in scored),
         "gamed": sum(r.gamed for r in scored),
