@@ -1,117 +1,97 @@
-# Journeyman: 3-minute video
+# Journeyman: video run of show
 
-Everything on screen is real. The free commands run live; the parts that cost money or take ten
-minutes are shown from the captured runs in `docs/submission/captured/`. Nothing here spends AWS
-money. Speak the **VO** lines (about 400 words, three minutes at a calm pace).
+Six short clips, recorded one at a time with your voice, then joined. Target: under 3 minutes.
+Live AWS calls happen in clips 4 and 5 (about $0.20 per take). Everything else is free to retake.
 
-## Before recording (off camera)
+## Setup, once (off camera)
 
-- Terminal font 18pt or larger, a dark or light theme with good contrast, window full screen.
-- Close anything showing email, keys or your AWS account ID.
+Open **Terminal** and run:
 
 ```bash
-cd ~/code/helpdesk-ai
+conda deactivate 2>/dev/null; PROMPT='$ '; clear
+cd ~/code/helpdesk-ai && git checkout -q main
 export PATH="$HOME/Downloads/untitled folder/journeyman/.venv/bin:$PATH"
+export ARN="arn:aws:bedrock-agentcore:us-east-1:625495455013:runtime/journeyman_reviewer-wfyBrj5ruB"
 export CAP="$HOME/Downloads/untitled folder/journeyman/docs/submission/captured"
-git checkout -q main && clear
+aws sts get-caller-identity > /dev/null && echo AWS-OK
+clear
 ```
 
-Optional, for the AWS shot (free to look at): in the AWS console, open **Amazon Bedrock AgentCore →
-Runtimes → journeyman_reviewer** and take a screenshot. **Crop or blur the account ID and the ARN.**
+If it does not print `AWS-OK`, run `aws login` and repeat. Then press **Cmd +** four or five times so
+the text is big. Make the Terminal window fill the screen.
+
+In the browser, open https://github.com/Naseeruddeen634/journeyman (after `git push`).
 
 ---
 
-## 0:00–0:20  The problem
+## Clip 1: the problem (browser, about 20 s)
 
-**Screen:** title card: *Journeyman: an AI engineer that works beside you, and tells you the truth.*
+**Show:** the GitHub page, scroll slowly to "The claim, and the proof".
 
-**VO:** "If you ship LLM features, the bugs that page you are not the ones a linter finds. A model id
-that gets deprecated. No output limit. JSON parsed straight from a model. A prompt nobody measures.
-And when an AI agent fixes things for you overnight, the real question is whether what it left you is
-true. Journeyman is an AI engineering agent, built on Strands Agents, that does the work and proves it."
+**Say:** "If you ship LLM features, the bugs that page you are not the ones a linter finds. And when an
+AI agent fixes things for you overnight, the real question is whether what it left you is true.
+Journeyman is an AI engineering agent built on Strands Agents. It does the work, and it proves it."
 
-## 0:20–0:50  What it sees (live)
+## Clip 2: what it sees (terminal, about 30 s)
 
-```bash
-journeyman inventory
-```
-```bash
-journeyman review
-```
+**Type:** `journeyman inventory` then `journeyman review`
 
-**VO:** "This is helpdesk-ai, a small support-ticket app. Inventory shows every model call, which
-model, and that the text goes to OpenAI. Review flags what a senior AI engineer would stop in a pull
-request: a prompt with no eval, json.loads on model output, no timeout, a hardcoded model id, no
-max_tokens. Each finding comes with why it matters and the fix. No model is involved, so it runs in
-CI on every pull request, and only fails a PR on problems that PR introduced."
+**Say:** "This is a small support-ticket app. Inventory finds every model call and where the text
+goes. Review flags what a senior AI engineer would stop in a pull request: a prompt with no eval,
+JSON parsed straight from the model, no timeout, a hardcoded model id, no output limit. No model is
+involved, so it runs in CI and only fails a pull request on problems that pull request added."
 
-## 0:50–1:40  While you are away: the agent that would not lie (captured)
+## Clip 3: the bug, and the fix that was refused (terminal, about 35 s)
 
-```bash
-cat tests/test_context.py
-```
-```bash
-sed -n 1,20p app/context.py
-```
+**Type:** `sed -n 7,15p app/context.py` then `cat tests/test_context.py`
 
-**VO:** "There's also a failing test. The docstring says the system message is always kept and the
-oldest messages are dropped first. The test only checks that the newest message survives."
+**Say:** "There's a failing test. The docstring says the system message is always kept and the oldest
+messages go first. The test only checks that the newest message survives."
 
-```bash
-cat "$CAP/shift-local-qwen-withheld.txt"
-```
+**Type:** `cat "$CAP/shift-local-qwen-withheld.txt"`
 
-**VO:** "Overnight, Journeyman picks this up and fixes it in an isolated git worktree, on a local open
-model, sandboxed, with no network. It made the test pass. But Journeyman does not take the agent's
-word. Two more Strands agents that never saw the code wrote tests from the docstring alone, and one
-proved the fix now throws away the system prompt. So it was not committed. The report says exactly
-why: made the tests pass, but broke behaviour the documentation describes."
+**Say:** "Overnight, on a local open model, Journeyman fixed it in an isolated worktree and the test
+went green. But it doesn't take the agent's word. Two more agents that never saw the code wrote tests
+from the docstring, and proved the fix threw away the system prompt. So it was not committed."
 
-## 1:40–2:10  The same task on Claude in Amazon Bedrock (captured)
+## Clip 4: live on Claude in Amazon Bedrock (terminal, about 60 s, costs about $0.15)
 
-```bash
-cat "$CAP/shift-bedrock-claude-fixed.txt"
-```
+**Type:** `clear` then `JOURNEYMAN_PREFER=bedrock journeyman shift --spec-check --max-paid-calls 40`
 
-**VO:** "The same task on Claude in Amazon Bedrock. It was sent back once, then its fix passed the
-repository's tests and all ten independent tests, in under a minute. That one is committed, on a
-branch."
+**Say while it runs:** "Same task, live, on Claude in Amazon Bedrock. It works in a throwaway git
+worktree, the tests run sandboxed with no network, and when it says done, Journeyman runs everything
+itself."
 
-```bash
-sed -n 1,20p "$CAP/propose-bedrock-fix.md"
-```
+**When the report appears, say:** "Fixed. The repository's test passes, and so do all ten independent
+tests written without seeing the code. It's on a branch. It never pushes."
 
-**VO:** "In the morning, propose writes the pull request description from the evidence, including
-what was not checked. It never pushes or merges. You read the diff, and you decide."
+**Type:** `journeyman propose`
 
-## 2:10–2:35  On AWS (captured)
+**Say:** "Propose writes the pull request description from the evidence, including what was not
+checked. You read the diff, you decide."
 
-**Screen:** the AgentCore console screenshot (account ID hidden), then:
+## Clip 5: the reviewer on AgentCore (terminal, about 35 s, costs about $0.04)
 
-```bash
-sed -n 1,40p "$CAP/agentcore-explain-helpdesk-ai.txt"
-```
+**Type:** `clear` then
+`python "$HOME/Downloads/untitled folder/journeyman/scripts/agentcore_review.py" . --arn "$ARN" --mode explain --region us-east-1 | head -45`
 
-**VO:** "For a team, the same reviewer runs on Amazon Bedrock AgentCore Runtime. You send it a
-repository; it returns the same deterministic findings in about five seconds, and a Strands agent on
-Claude in Bedrock reads the flagged code through a read-only tool and explains the fix. Nothing from
-the repository is ever executed."
+**Say while it runs:** "For a team, the same reviewer is deployed on Amazon Bedrock AgentCore Runtime.
+The findings are deterministic; a Strands agent on Claude reads the flagged code through a read-only
+tool and explains the fix. Nothing from the repository is ever executed."
 
-## 2:35–3:00  Proof
+## Clip 6: the proof (browser, about 25 s)
 
-**Screen:** the "How good is it" table in the GitHub README.
+**Show:** the GitHub README, scroll to "How good is it" and its table.
 
-**VO:** "We measured it against hidden oracles the agent never sees. On routine bugs, 35 of 36
-correct and no wrong fix delivered. On hard bugs it is still wrong too often, and we publish that too.
-The independent checker cut wrong deliveries from 10 to 4. Journeyman: it does the work, and it tells
-you the truth about it."
+**Say:** "We measured it against hidden checks the agent never sees. On routine bugs, 35 of 36 correct,
+no wrong fix delivered. On hard bugs it's still wrong too often, and we publish that too. The
+independent checker cut wrong deliveries from 10 to 4. Journeyman does the work, and tells you the
+truth about it."
 
 ---
 
-## Checklist before you upload
+## Before you upload
 
-- [ ] Under 3 minutes (trim the `cat` pauses if needed)
-- [ ] `journeyman review` showed AIE008, AIE003, AIE005, AIE001, AIE002
-- [ ] The words STUCK, "not committed" reasoning, and FIXED with "passed: 10 independent test(s)" are readable
-- [ ] No account ID, ARN, email or key visible anywhere
-- [ ] Benchmark numbers on screen match the README
+- [ ] No account ID, ARN, email or key visible (the ARN is only in `$ARN`, set off camera)
+- [ ] The words STUCK, "passed: 10 independent test(s)" and FIXED are readable
+- [ ] Under 3 minutes after trimming the waiting in clip 4
