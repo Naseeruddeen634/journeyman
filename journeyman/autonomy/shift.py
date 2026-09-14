@@ -181,12 +181,12 @@ def failing_set(repo: Path) -> tuple[set[str], str]:
 
     What matters is whether the agent broke anything that was working.
     """
-    from .scout import _interpreter
+    from .scout import _interpreter, fresh_env
 
     try:
         r = subprocess.run(
             [_interpreter(repo), "-m", "pytest", "-q", "--no-header", "--tb=no"],
-            cwd=repo, capture_output=True, text=True, timeout=300)
+            cwd=repo, capture_output=True, text=True, timeout=300, env=fresh_env())
     except (subprocess.TimeoutExpired, OSError) as exc:
         return set(), f"could not run the suite: {exc}"
     out = r.stdout + r.stderr
@@ -321,9 +321,11 @@ def _tools_for(sandbox: Sandbox, result: ShiftResult, task: Task | None = None):
             base = sandbox.resolve(subdir)
         except Refused as exc:
             return f"Refused: {exc}"
+        from .scout import skipped
+
         out = []
         for p in sorted(base.rglob("*.py")):
-            if any(x in p.parts for x in (".git", ".venv", "__pycache__", ".journeyman")):
+            if skipped(p, sandbox.root, {".git", ".venv", "__pycache__", ".journeyman"}):
                 continue
             out.append(str(p.relative_to(sandbox.root)))
         return "\n".join(out[:200]) or "(nothing)"

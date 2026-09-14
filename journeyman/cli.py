@@ -287,6 +287,18 @@ def _bench(args) -> int:
     return 0
 
 
+def _pair(args) -> int:
+    """Beside you while you work: affected tests on save, silent unless red."""
+    from .pair import macos_notify, watch
+
+    try:
+        watch(args.repo, interval=args.interval,
+              notify=macos_notify if args.notify else None)
+    except KeyboardInterrupt:
+        print("\n  unpaired.\n")
+    return 0
+
+
 def _brain(args) -> int:
     from .brain.models import check
     st = check()
@@ -369,6 +381,12 @@ def main(argv: list[str] | None = None) -> int:
     rs.add_argument("--repo", action="append")
     rs.add_argument("--max-shifts", type=int, default=2)
     rs.set_defaults(func=_run_scheduled)
+
+    pr = sub.add_parser("pair", help="work beside you: affected tests on save, quiet unless red")
+    pr.add_argument("--repo", default=".")
+    pr.add_argument("--interval", type=float, default=1.0)
+    pr.add_argument("--notify", action="store_true", help="macOS banner when something goes red")
+    pr.set_defaults(func=_pair)
 
     bn = sub.add_parser("bench", help="measure the agent against hidden oracles")
     bn.add_argument("--cases", default=None)

@@ -19,6 +19,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 
+def _fresh(extra: dict) -> dict:
+    from .scout import fresh_env  # stale-bytecode-safe, see scout.fresh_env
+    return fresh_env(extra)
+
+
 class Refused(Exception):
     """Raised when the agent tries something it is not permitted to do."""
 
@@ -144,7 +149,7 @@ class Sandbox:
         return subprocess.run(
             command, shell=True, cwd=self.root, capture_output=True,
             text=True, timeout=timeout,
-            env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
+            env=_fresh({"GIT_TERMINAL_PROMPT": "0"}),
         )
 
     def _git(self, args: list[str]) -> str:

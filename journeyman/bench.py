@@ -27,7 +27,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from .autonomy.guardrails import Budget
-from .autonomy.scout import ai_engineering_review, survey
+from .autonomy.scout import ai_engineering_review, fresh_env, survey
 from .autonomy.shift import work_one
 
 DEFAULT_CASES = Path(__file__).resolve().parents[1] / "bench" / "cases"
@@ -88,7 +88,7 @@ def _oracle(case_dir: Path, tree: Path) -> tuple[bool, str]:
         r = subprocess.run(
             [sys.executable, "-m", "pytest", "-q", "--no-header", "-p", "no:cacheprovider",
              "--tb=short", target.name],
-            cwd=tree, capture_output=True, text=True, timeout=120)
+            cwd=tree, capture_output=True, text=True, timeout=120, env=fresh_env())
         return r.returncode == 0, (r.stdout + r.stderr)[-1500:]
     except subprocess.TimeoutExpired:
         return False, "oracle timed out"

@@ -40,16 +40,55 @@ class Task:
                 "evidence": self.evidence[:2000], "meta": self.meta}
 
 
+def skipped(path: Path, root: Path, skip=SKIP_DIRS) -> bool:
+    """True if a path sits inside a skipped directory *below* the repo root.
+
+    Checking the absolute path's parts, which every scanner here used to do,
+    silently skips the entire repo whenever an ancestor directory has one of
+    these names. A repo at ~/build/app, or any sandbox under
+    .journeyman/worktrees, looked empty: no review findings, no TODOs, no
+    files, and a check_my_fix that told the agent every finding was gone.
+    """
+    try:
+        rel = path.resolve().relative_to(root.resolve())
+    except ValueError:
+        return True
+    return any(part in skip for part in rel.parts[:-1] + (rel.parts[-1:] if path.is_dir() else ()))
+
+
 def _py_files(repo: Path) -> list[Path]:
-    out = []
-    for p in repo.rglob("*.py"):
-        if any(part in SKIP_DIRS for part in p.parts):
-            continue
-        out.append(p)
-    return out
+    return [p for p in repo.rglob("*.py") if not skipped(p, repo)]
 
 
 # ---------------------------------------------------------------- sources
+
+
+_PYC_PREFIX: str | None = None
+
+
+def fresh_env(extra: dict | None = None) -> dict:
+    """Environment for running someone's tests without trusting bytecode caches.
+
+    Python validates a cached .pyc by the source file's size and whole-second
+    mtime. Change `1.23` to `1.32` and run the tests within the same second, and
+    the size matches, the second matches, and Python runs the old code. The
+    agent edits and runs tests in exactly that rhythm, and the shift verifies
+    seconds later. Every verdict could have been read off stale bytecode.
+
+    PYTHONPYCACHEPREFIX points reads and writes at a private directory, so the
+    repo's own __pycache__ is never consulted; PYTHONDONTWRITEBYTECODE keeps
+    that directory from filling up.
+    """
+    import os
+    import tempfile
+
+    global _PYC_PREFIX
+    if _PYC_PREFIX is None:
+        _PYC_PREFIX = tempfile.mkdtemp(prefix="journeyman-pyc-")
+    env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPYCACHEPREFIX": _PYC_PREFIX}
+    if extra:
+        env.update(extra)
+    return env
 
 
 def _interpreter(repo: Path) -> str:
@@ -72,7 +111,7 @@ def failing_tests(repo: Path, timeout: int = 300) -> list[Task]:
     try:
         r = subprocess.run(
             [_interpreter(repo), "-m", "pytest", "-q", "--no-header", "--tb=short"],
-            cwd=repo, capture_output=True, text=True, timeout=timeout,
+            cwd=repo, capture_output=True, text=True, timeout=timeout, env=fresh_env(),
         )
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
         return []
@@ -150,7 +189,8 @@ def untested_functions(repo: Path, limit: int = 25) -> list[Task]:
 
     tasks = []
     for path in _py_files(repo):
-        if "test" in path.parts or path.name.startswith("test_"):
+        rel_parts = path.relative_to(repo).parts
+        if "test" in rel_parts or "tests" in rel_parts or path.name.startswith("test_"):
             continue
         try:
             tree = ast.parse(path.read_text(encoding="utf8", errors="ignore"))

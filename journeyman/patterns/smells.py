@@ -62,6 +62,19 @@ MODEL_ID = re.compile(
 )
 
 
+def _skipped(path: Path, repo: Path) -> bool:
+    """Skip directories are judged relative to the repo, never by absolute path.
+
+    See autonomy.scout.skipped for the incident: every sandbox and every repo
+    under a directory called build or venv reviewed as empty.
+    """
+    try:
+        rel = path.resolve().relative_to(repo.resolve())
+    except ValueError:
+        return True
+    return any(part in SKIP for part in rel.parts[:-1])
+
+
 def ignore_patterns(repo: Path) -> list[str]:
     """Patterns from .journeymanignore, gitignore-style but deliberately simple.
 
@@ -104,7 +117,7 @@ def _files(repo: Path) -> list[Path]:
     patterns = ignore_patterns(repo)
     out = []
     for p in repo.rglob("*.py"):
-        if any(s in p.parts for s in SKIP):
+        if _skipped(p, repo):
             continue
         if patterns and is_ignored(str(p.relative_to(repo)), patterns):
             continue
@@ -397,7 +410,7 @@ def check_prompt_without_eval(repo: Path) -> list[Finding]:
     prompt_files: list[tuple[Path, str]] = []
     patterns = ignore_patterns(repo)
     for p in repo.rglob("*"):
-        if any(s in p.parts for s in SKIP) or not p.is_file():
+        if not p.is_file() or _skipped(p, repo):
             continue
         if patterns and is_ignored(str(p.relative_to(repo)), patterns):
             continue
