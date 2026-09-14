@@ -492,6 +492,15 @@ def _ci(args) -> int:
     return 0
 
 
+def _doctor(args) -> int:
+    """Check for every silent failure found while building this."""
+    from .doctor import render, run
+
+    checks = run(args.repo)
+    print(render(checks))
+    return 1 if any(c.status == "fail" for c in checks) else 0
+
+
 def _brain(args) -> int:
     from .brain.models import check
     st = check()
@@ -610,6 +619,10 @@ def main(argv: list[str] | None = None) -> int:
     ci.add_argument("--fail-on", type=int, default=80)
     ci.add_argument("--overwrite", action="store_true")
     ci.set_defaults(func=_ci)
+
+    dr = sub.add_parser("doctor", help="check for every silent failure found the hard way")
+    dr.add_argument("--repo", default=".")
+    dr.set_defaults(func=_doctor)
 
     mc = sub.add_parser("mcp", help="serve read-only tools to MCP clients (Claude Code, Cursor)")
     mc.set_defaults(func=_mcp)
