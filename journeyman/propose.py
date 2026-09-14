@@ -128,11 +128,27 @@ def propose(repo: str | Path, branch: str | None = None) -> dict:
     path = outdir / f"{branch.replace('/', '-')}.md"
     path.write_text(text, encoding="utf8")
 
-    commands = [
-        f"git push -u origin {shlex.quote(branch)}",
-        f"gh pr create --base {shlex.quote(base)} --head {shlex.quote(branch)} "
-        f"--title {shlex.quote(title)} --body-file {shlex.quote(str(path))}",
-    ]
+    import shutil
+
+    # Only print commands that will work here. The first version printed
+    # `git push -u origin` for repos with no origin and `gh pr create` on a
+    # machine without gh, so the two lines it handed you both failed.
+    remote = _git(repo, "remote")
+    remote = "origin" if "origin" in remote.split() else (remote.split() or [""])[0]
+    commands, notes = [], []
+    if remote:
+        commands.append(f"git push -u {remote} {shlex.quote(branch)}")
+        if shutil.which("gh"):
+            commands.append(f"gh pr create --base {shlex.quote(base)} --head {shlex.quote(branch)} "
+                            f"--title {shlex.quote(title)} --body-file {shlex.quote(str(path))}")
+        else:
+            notes.append("gh is not installed, so open the pull request from the pushed branch "
+                         f"in your browser and paste the description from {path}. "
+                         "(brew install gh to do it from the terminal.)")
+    else:
+        notes.append("This repository has no remote, so there is nothing to push to. The branch "
+                     f"is local: review it with  git diff {base}...{branch}  and merge it "
+                     "yourself if you want it.")
     return {"ok": True, "branch": branch, "base": base, "title": title,
-            "body_file": str(path), "body": text, "commands": commands,
+            "body_file": str(path), "body": text, "commands": commands, "notes": notes,
             "concerns": len(record.get("concerns") or [])}

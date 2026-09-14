@@ -390,9 +390,15 @@ def _propose(args) -> int:
         print(f"  The agent flagged {r['concerns']} concern(s) about its own change. "
               "They are at the top of the description.")
     print(f"\n  Description: {r['body_file']}\n")
-    print("  Journeyman does not push or open pull requests. When you have read the diff:\n")
-    for c in r["commands"]:
-        print(f"    {c}")
+    print("  Journeyman does not push or open pull requests.", end="")
+    if r["commands"]:
+        print(" When you have read the diff:\n")
+        for c in r["commands"]:
+            print(f"    {c}")
+    else:
+        print()
+    for n in r.get("notes", []):
+        print(f"\n  {n}")
     print()
     return 0
 

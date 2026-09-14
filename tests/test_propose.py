@@ -54,17 +54,39 @@ def env(tmp_path, monkeypatch):
     importlib.reload(propose)
 
 
-def test_it_writes_a_description_and_prints_commands_without_running_them(env):
+def test_it_writes_a_description_and_prints_commands_without_running_them(env, monkeypatch):
     repo, record, propose = env
     record()
-    remotes_before = subprocess.run(["git", "remote"], cwd=repo, capture_output=True, text=True).stdout
+    subprocess.run(["git", "remote", "add", "origin", "https://example.invalid/x.git"], cwd=repo)
+    monkeypatch.setattr("shutil.which", lambda name: "/usr/local/bin/gh" if name == "gh" else None)
     r = propose.propose(repo)
     assert r["ok"], r
     assert Path(r["body_file"]).exists()
     assert r["commands"][0].startswith("git push -u origin")
     assert r["commands"][1].startswith("gh pr create --base main --head")
-    remotes_after = subprocess.run(["git", "remote"], cwd=repo, capture_output=True, text=True).stdout
-    assert remotes_before == remotes_after == "", "propose must not push or add remotes"
+    log = subprocess.run(["git", "log", "--all", "--oneline"], cwd=repo, capture_output=True, text=True)
+    assert "origin/" not in subprocess.run(["git", "branch", "-a"], cwd=repo,
+                                           capture_output=True, text=True).stdout, \
+        "propose must not push"
+
+
+def test_no_gh_means_no_gh_command(env, monkeypatch):
+    """Printing a command that will fail is worse than printing none."""
+    repo, record, propose = env
+    record()
+    subprocess.run(["git", "remote", "add", "origin", "https://example.invalid/x.git"], cwd=repo)
+    monkeypatch.setattr("shutil.which", lambda name: None)
+    r = propose.propose(repo)
+    assert [c for c in r["commands"] if c.startswith("gh ")] == []
+    assert any("gh is not installed" in n for n in r["notes"])
+
+
+def test_no_remote_means_no_push_command(env):
+    repo, record, propose = env
+    record()
+    r = propose.propose(repo)
+    assert r["commands"] == []
+    assert any("no remote" in n for n in r["notes"])
 
 
 def test_the_description_says_what_was_checked_and_what_was_not(env):
