@@ -72,7 +72,9 @@ verify**.
 
 ### Scale assumptions (planning figures)
 
-- 50,000 cases/day across tenants, peak 3× the mean for four hours → ~5 cases/s peak.
+- 50,000 cases/day across tenants, arriving mostly in business hours: 1.74 cases/s over an
+  8-hour day, peak 3× that → **5.2 cases/s**. The arithmetic and what it implies for worker count,
+  cost and storage is in `capacity.md`.
 - 2 KB of case text on average; 20 KB p99.
 - Triage: one model call (~1,500 input tokens, ~250 output).
 - Fix jobs: 200/day, each minutes long, bursty.
