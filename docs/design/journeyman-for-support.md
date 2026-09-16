@@ -363,8 +363,9 @@ including the blind checkers, was 12 model calls and finished in 0.7 minutes).
 | Remote reviewer as a service | **Built and deployed** on Amazon Bedrock AgentCore |
 | Case ingestion, triage worker, validation, budget, queue with dead letters, HTTP API | **Built** in `journeyman/support/` (24 tests) |
 | Dashboard: health tiles, alerts, suggestions with evidence, decisions | **Built** in `dashboard/` (React + TypeScript, 17 tests) |
-| Clustering, fix-job runner, writeback to Dataverse | **Designed, not built** |
-| Azure deployment, Dataverse integration, vector retrieval | **Designed, not built** |
+| Dataverse client: delta paging, throttling, ETag concurrency, idempotent note upsert | **Built** in `journeyman/support/dataverse.py` (9 tests, fake transport) |
+| Clustering, fix-job runner, the writeback worker that drives the client | **Designed, not built** |
+| Azure deployment, vector retrieval, Power Automate flow | **Designed, not built** |
 
 The slice in `journeyman/support/` implements the triage path end to end against an in-process
 queue and SQLite, with the deterministic validation, the budget guard, the idempotency key and the
