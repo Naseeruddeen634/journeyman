@@ -234,3 +234,63 @@ def test_health_raises_the_alerts_an_on_call_engineer_would_want():
     assert any("10% of model answers" in a for a in state["alerts"])
     assert any("could not be handled" in a for a in state["alerts"])
     assert any("daily budget" in a for a in state["alerts"])
+
+
+# ------------------------------------------------------------------ the API the dashboard uses
+
+def make_api(store=None):
+    from journeyman.support.api import Api
+
+    store = store or make_store()
+    q, metrics = Queue(), {}
+    return Api(store, q, metrics), store, q, metrics
+
+
+def test_the_api_serves_health_and_suggestions_for_the_callers_tenant_only():
+    api, store, q, metrics = make_api()
+    store.upsert_case(Case("acme", "c-1", 1, "portal", "t", "b"))
+    store.upsert_case(Case("globex", "g-1", 1, "portal", "t", "b"))
+    TriageWorker(store, model(GOOD), metrics=metrics).handle(Case("acme", "c-1", 1, "portal", "t", "b"))
+    TriageWorker(store, model(json.dumps({"queue": "general", "severity": 1, "summary": "x"})),
+                 metrics=metrics).handle(Case("globex", "g-1", 1, "portal", "t", "b"))
+
+    status, body = api.handle("GET", "/v1/suggestions", {}, None)
+    assert status == 200 and [s["case_id"] for s in body] == ["c-1"], "globex rows must not appear"
+
+    status, health_body = api.handle("GET", "/v1/health/acme", {}, None)
+    assert status == 200 and health_body["queue_depth"] == 0
+
+
+def test_a_decision_is_recorded_once_and_a_second_one_is_a_conflict():
+    api, store, _, metrics = make_api()
+    store.upsert_case(Case("acme", "c-1", 1, "portal", "t", "b"))
+    result = TriageWorker(store, model(GOOD), metrics=metrics).handle(Case("acme", "c-1", 1, "portal", "t", "b"))
+
+    assert api.handle("POST", f"/v1/suggestions/{result.suggestion_id}/decision", {},
+                      {"decision": "accepted"})[0] == 204
+    status, body = api.handle("POST", f"/v1/suggestions/{result.suggestion_id}/decision", {},
+                              {"decision": "rejected"})
+    assert status == 409 and "already decided" in body["error"]
+    assert api.handle("POST", f"/v1/suggestions/{result.suggestion_id}/decision", {},
+                      {"decision": "maybe"})[0] == 400
+    assert api.handle("POST", "/v1/suggestions/999/decision", {}, {"decision": "accepted"})[0] == 404
+
+
+def test_readiness_names_the_failing_dependency_and_liveness_does_not():
+    api, _, q, _ = make_api()
+    assert api.handle("GET", "/v1/health", {}, None) == (200, {"status": "up"})
+    assert api.handle("GET", "/v1/ready", {}, None)[0] == 200
+    q.enqueue({"case_id": "x"})
+    q.max_attempts = 0
+    q.nack(q.lease(), "boom")
+    status, checks = api.handle("GET", "/v1/ready", {}, None)
+    assert status == 503 and "dead letter" in checks["queue"]
+
+
+def test_ingest_over_http_uses_the_callers_tenant_not_the_body():
+    api, store, q, _ = make_api()
+    status, body = api.handle("POST", "/v1/ingest/case", {},
+                              {"tenant_id": "globex", "case_id": "c-9", "revision": 1,
+                               "product": "portal", "title": "t", "body": "b"})
+    assert status == 202 and body["accepted"] is True
+    assert store.db.execute("SELECT tenant_id FROM cases WHERE case_id = 'c-9'").fetchone()[0] == "acme"

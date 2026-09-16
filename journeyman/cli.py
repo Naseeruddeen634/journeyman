@@ -513,6 +513,7 @@ def _ci(args) -> int:
 def _support(args) -> int:
     """Run the support triage path end to end, locally, and print what an operator would see."""
     import json as _json
+    import threading
 
     from .support.queue import Queue
     from .support.service import Ingest, Worker, health
@@ -578,6 +579,18 @@ def _support(args) -> int:
     for k, v in health(store, queue, metrics, "acme").items():
         print(f"    {k:<26} {v}")
     print()
+
+    if args.serve:
+        from .support.api import Api, serve
+
+        api = Api(store, queue, metrics)
+        serve(api, port=args.port)
+        print(f"  API on http://127.0.0.1:{args.port}/v1  (health, ready, suggestions, decision, ingest)")
+        print(f"  Dashboard: cd dashboard && npm run dev\n")
+        try:
+            threading.Event().wait()
+        except KeyboardInterrupt:
+            print("  stopped\n")
     return 0
 
 
@@ -734,6 +747,8 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("--live", action="store_true", help="use a real model instead of a canned answer")
     sp.add_argument("--budget", type=float, default=10.0, metavar="CENTS",
                     help="daily budget for the demo tenant; spend it to see the degraded path")
+    sp.add_argument("--serve", action="store_true", help="keep the API running for the dashboard")
+    sp.add_argument("--port", type=int, default=8787)
     sp.set_defaults(func=_support)
 
     iv = sub.add_parser("inventory", help="every model call: which model, output limit, where the text goes")

@@ -41,12 +41,15 @@ function mockFetch(responses: Record<string, unknown>, failHealth = false) {
   return vi.fn(async (url: string) => {
     if (failHealth && url.includes("/health/")) throw new Error("connection refused");
     const key = Object.keys(responses).find((k) => url.includes(k));
+    const body = key === undefined ? "" : JSON.stringify(responses[key]);
     return {
       ok: key !== undefined,
       status: key ? 200 : 404,
       statusText: key ? "OK" : "Not Found",
-      json: async () => responses[key as string],
-    } as Response;
+      headers: { get: (header: string) => (header === "Content-Length" ? String(body.length) : null) },
+      text: async () => body,
+      json: async () => JSON.parse(body),
+    } as unknown as Response;
   });
 }
 

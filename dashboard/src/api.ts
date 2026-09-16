@@ -21,7 +21,19 @@ export async function getJson<T>(url: string, init: RequestInit = {}): Promise<R
     if (!response.ok) {
       return { ok: false, error: `${response.status} ${response.statusText}` };
     }
-    return { ok: true, value: (await response.json()) as T };
+    // 204 and an empty body are successes with nothing to parse. Calling .json() on them throws,
+    // and the first version reported a recorded decision as a failure and rolled the card back
+    // while the server had already saved it.
+    if (response.status === 204 || response.headers.get("Content-Length") === "0") {
+      return { ok: true, value: undefined as T };
+    }
+    const text = await response.text();
+    if (text.trim() === "") return { ok: true, value: undefined as T };
+    try {
+      return { ok: true, value: JSON.parse(text) as T };
+    } catch {
+      return { ok: false, error: `response was not JSON: ${text.slice(0, 80)}` };
+    }
   } catch (error) {
     const name = error instanceof Error ? error.name : "Error";
     return { ok: false, error: name === "AbortError" ? `no response in ${TIMEOUT_MS / 1000}s` : String(error) };
@@ -35,7 +47,7 @@ export const api = {
   suggestions: (tenant: string) =>
     getJson<Suggestion[]>(`/v1/suggestions?tenant=${encodeURIComponent(tenant)}`),
   decide: (id: number, decision: "accepted" | "edited" | "rejected") =>
-    getJson<{ ok: boolean }>(`/v1/suggestions/${id}/decision`, {
+    getJson<void>(`/v1/suggestions/${id}/decision`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ decision }),

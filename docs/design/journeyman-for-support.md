@@ -361,9 +361,23 @@ including the blind checkers, was 12 model calls and finished in 0.7 minutes).
 |---|---|
 | Review, inventory, eval, pair, shift, verification, blind spec check, sandbox, budgets | **Built and tested** (358 tests) |
 | Remote reviewer as a service | **Built and deployed** on Amazon Bedrock AgentCore |
-| Case ingestion, triage worker, clustering, writeback, dashboard, SQL store | **This design**; a working slice lives in `journeyman/support/` |
+| Case ingestion, triage worker, validation, budget, queue with dead letters, HTTP API | **Built** in `journeyman/support/` (24 tests) |
+| Dashboard: health tiles, alerts, suggestions with evidence, decisions | **Built** in `dashboard/` (React + TypeScript, 17 tests) |
+| Clustering, fix-job runner, writeback to Dataverse | **Designed, not built** |
 | Azure deployment, Dataverse integration, vector retrieval | **Designed, not built** |
 
 The slice in `journeyman/support/` implements the triage path end to end against an in-process
 queue and SQLite, with the deterministic validation, the budget guard, the idempotency key and the
 degradation path, so the design's riskiest claims are executable rather than asserted.
+
+Run it:
+
+```bash
+journeyman support                 # ingest, triage and health, printed, offline
+journeyman support --serve         # the same, then hold the API open on :8787
+cd dashboard && npm install && npm run dev    # the lead's screen on :5173, proxying /v1
+```
+
+Two defects this found that a document would not have: a `204 No Content` reply made the dashboard
+report a recorded decision as a failure and roll the card back while the server had saved it, and
+the first architecture sketch had triage and fix jobs sharing a worker pool.
