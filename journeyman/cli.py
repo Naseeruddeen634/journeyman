@@ -510,6 +510,77 @@ def _ci(args) -> int:
     return 0
 
 
+def _support(args) -> int:
+    """Run the support triage path end to end, locally, and print what an operator would see."""
+    import json as _json
+
+    from .support.queue import Queue
+    from .support.service import Ingest, Worker, health
+    from .support.store import Case, Store
+    from .support.triage import TriageWorker
+
+    store, queue, metrics = Store(), Queue(), {}
+    store.add_tenant("acme", "Acme", ["billing", "identity", "platform", "how-to"],
+                     budget_daily_cents=args.budget)
+    store.upsert_case(Case("acme", "old-1", 1, "portal", "Sign-in fails with AADSTS50011",
+                           "Redirect URI mismatch after the tenant rename.",
+                           resolution="Added the new reply URL to the app registration."))
+
+    def brain(system: str, prompt: str) -> str:
+        if args.live:
+            from strands import Agent
+
+            from .brain.models import pick
+            model, name, why = pick("routine")
+            print(f"  model: {name} ({why})")
+            return str(Agent(model=model, system_prompt=system, callback_handler=None)(prompt)).strip()
+        # A canned answer so the demo runs offline. --live sends the same prompt to a real model.
+        if "billed" in prompt.lower() or "invoice" in prompt.lower():
+            return _json.dumps({"queue": "billing", "severity": 3,
+                                "summary": "Customer was moved to Enterprise but is still billed for "
+                                           "the Team plan; needs a plan and invoice correction.",
+                                "known_issue": None})
+        return _json.dumps({"queue": "identity", "severity": 2,
+                            "summary": "Sign-in is failing with a redirect URI mismatch after the "
+                                       "tenant rename; the same fix as case old-1 applies.",
+                            "known_issue": "old-1"})
+
+    ingest = Ingest(store, queue, metrics)
+    worker = Worker(store, queue, TriageWorker(store, brain, metrics=metrics), metrics)
+
+    cases = [
+        ("c-101", "Sign-in fails with AADSTS50011", "Nobody can sign in since the rename. Redirect mismatch."),
+        ("c-102", "Invoice shows the wrong plan", "We were moved to Enterprise but billed for Team."),
+        ("c-103", "Sign-in fails with AADSTS50011", "Same as the other ticket, redirect URI mismatch."),
+    ]
+    print("\n  ingest")
+    for cid, title, body in cases:
+        r = ingest.accept({"tenant_id": "acme", "case_id": cid, "revision": 1, "product": "portal",
+                           "title": title, "body": body})
+        print(f"    {cid}  accepted={r['accepted']} duplicate={r['duplicate']}")
+    r = ingest.accept({"tenant_id": "acme", "case_id": "c-101", "revision": 1, "product": "portal",
+                       "title": cases[0][1], "body": cases[0][2]})
+    print(f"    c-101  redelivered -> duplicate={r['duplicate']} (no second triage)")
+
+    print("\n  triage")
+    for result in worker.drain():
+        if result.rejected:
+            print(f"    {result.case_id}  REJECTED: {result.rejected}")
+            continue
+        mark = "degraded" if result.degraded else f"{result.payload['queue']} sev{result.payload['severity']}"
+        print(f"    {result.case_id}  {mark:<22} {result.cost_cents:.4f}c  {result.latency_ms}ms")
+        print(f"           {result.payload['summary'][:96]}")
+        if result.evidence.get("similar_cases"):
+            near = result.evidence["similar_cases"][0]
+            print(f"           similar: {near['case_id']} ({near['score']}) {near['resolution'][:48]}")
+
+    print("\n  health")
+    for k, v in health(store, queue, metrics, "acme").items():
+        print(f"    {k:<26} {v}")
+    print()
+    return 0
+
+
 def _inventory(args) -> int:
     """Every model call in the repo, which model, and where the text goes."""
     import json
@@ -658,6 +729,12 @@ def main(argv: list[str] | None = None) -> int:
     ci.add_argument("--fail-on", type=int, default=80)
     ci.add_argument("--overwrite", action="store_true")
     ci.set_defaults(func=_ci)
+
+    sp = sub.add_parser("support", help="demo the support triage service (design: docs/design)")
+    sp.add_argument("--live", action="store_true", help="use a real model instead of a canned answer")
+    sp.add_argument("--budget", type=float, default=10.0, metavar="CENTS",
+                    help="daily budget for the demo tenant; spend it to see the degraded path")
+    sp.set_defaults(func=_support)
 
     iv = sub.add_parser("inventory", help="every model call: which model, output limit, where the text goes")
     iv.add_argument("--repo", default=".")

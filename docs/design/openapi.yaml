@@ -1,0 +1,278 @@
+openapi: 3.1.0
+info:
+  title: Journeyman for Support
+  version: 0.1.0
+  description: |
+    Case triage and unattended fix jobs for a support organisation.
+
+    Two rules run through the whole API:
+      * every response says where its content came from (retrieval, a rule, or a model, with the
+        prompt version and model id), so a reader can judge it;
+      * nothing here sends a customer-facing message or merges code. Suggestions are suggestions.
+
+    Auth: Entra ID bearer tokens. The tenant comes from the token claim, never from the path,
+    so one tenant cannot read another's cases by changing a URL.
+servers:
+  - url: https://support.journeyman.internal/v1
+
+security:
+  - bearerAuth: []
+
+paths:
+  /ingest/case:
+    post:
+      summary: Dataverse webhook target for case created or updated
+      description: |
+        Idempotent. The key is (tenant, case_id, revision): a redelivered webhook returns 200 with
+        `duplicate: true` and does no work. Returns as soon as the case row and the queue message
+        are durable, so Dataverse is never waiting on a model.
+      security:
+        - webhookSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CaseEvent' }
+      responses:
+        '202':
+          description: Accepted for triage
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accepted: { type: boolean }
+                  duplicate: { type: boolean }
+                  case_id: { type: string }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { description: Signature invalid }
+        '429':
+          description: Backpressure. Retry after the given seconds.
+          headers:
+            Retry-After: { schema: { type: integer } }
+
+  /cases/{case_id}/suggestion:
+    get:
+      summary: The latest triage suggestion for a case, with its evidence
+      parameters:
+        - name: case_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Suggestion' }
+        '404': { description: No suggestion yet }
+
+  /suggestions/{id}/decision:
+    post:
+      summary: Record what the human did with a suggestion
+      description: |
+        Accept, edit or reject. The decision is the label for the next eval set, which is how the
+        prompt improves without anyone guessing.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [accepted, edited, rejected] }
+                corrected: { $ref: '#/components/schemas/TriagePayload' }
+                note: { type: string }
+      responses:
+        '204': { description: Recorded }
+        '409': { description: Already decided }
+
+  /clusters:
+    get:
+      summary: Open case clusters, newest first
+      parameters:
+        - name: min_cases
+          in: query
+          schema: { type: integer, default: 5 }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Cluster' }
+
+  /fix-jobs:
+    post:
+      summary: Open a fix job for a repository
+      description: |
+        Normally opened by the cluster detector; a lead or engineer can open one by hand. The commit
+        is pinned so the job is reproducible, and `spec_check` turns on the blind checker for repos
+        where a wrong fix would be expensive.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [repo, task]
+              properties:
+                repo: { type: string, example: 'https://github.com/acme/support-api' }
+                commit_sha: { type: string }
+                task: { type: string }
+                cluster_id: { type: integer, format: int64 }
+                spec_check: { type: boolean, default: true }
+      responses:
+        '202':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FixJob' }
+
+  /fix-jobs/{id}:
+    get:
+      summary: State and outcome of a fix job
+      description: |
+        `outcome: withheld` with a `refusal_reason` is a successful run, not an error: the agent
+        could not prove the change and refused to commit it.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FixJob' }
+
+  /health:
+    get:
+      summary: Liveness
+      security: []
+      responses:
+        '200': { description: Process is up }
+
+  /ready:
+    get:
+      summary: Readiness. Checks the database, the queue and one cheap model probe.
+      security: []
+      responses:
+        '200': { description: Ready }
+        '503':
+          description: Not ready; the body names the failing dependency
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  database: { type: string }
+                  queue: { type: string }
+                  model: { type: string }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    webhookSignature:
+      type: apiKey
+      in: header
+      name: X-Dataverse-Signature
+
+  responses:
+    BadRequest:
+      description: The request could not be understood; the body says which field
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error: { type: string }
+              field: { type: string }
+
+  schemas:
+    CaseEvent:
+      type: object
+      required: [case_id, revision, product, title, body, created_at]
+      properties:
+        case_id: { type: string }
+        revision: { type: integer, description: Dataverse versionnumber }
+        product: { type: string }
+        title: { type: string }
+        body: { type: string, description: Customer text. Stored in the tenant's blob, never logged. }
+        language: { type: string }
+        created_at: { type: string, format: date-time }
+
+    TriagePayload:
+      type: object
+      required: [queue, severity, summary]
+      properties:
+        queue: { type: string, description: Must be one of the tenant's configured queues }
+        severity: { type: integer, minimum: 1, maximum: 4 }
+        summary: { type: string, maxLength: 600 }
+        known_issue: { type: string, nullable: true }
+
+    Suggestion:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        case_id: { type: string }
+        kind: { type: string, enum: [triage, reply_draft, kb_gap] }
+        payload: { $ref: '#/components/schemas/TriagePayload' }
+        evidence:
+          type: object
+          description: What the suggestion was based on. Shown to the human next to the suggestion.
+          properties:
+            similar_cases:
+              type: array
+              items:
+                type: object
+                properties:
+                  case_id: { type: string }
+                  score: { type: number }
+                  resolution: { type: string }
+            rules_applied: { type: array, items: { type: string } }
+            input_hash: { type: string }
+        confidence: { type: number, minimum: 0, maximum: 1 }
+        model_id:
+          type: string
+          description: 'The model that wrote the words, or "retrieval-only" when the model was skipped.'
+        prompt_version: { type: string }
+        degraded: { type: boolean, description: True when the budget or an outage forced retrieval-only }
+        latency_ms: { type: integer }
+        cost_cents: { type: number }
+        created_at: { type: string, format: date-time }
+        human_decision: { type: string, nullable: true }
+
+    Cluster:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        signature: { type: string }
+        product: { type: string }
+        case_count: { type: integer }
+        first_seen: { type: string, format: date-time }
+        last_seen: { type: string, format: date-time }
+        fix_job_id: { type: integer, format: int64, nullable: true }
+
+    FixJob:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        repo: { type: string }
+        commit_sha: { type: string }
+        task: { type: string }
+        state: { type: string, enum: [queued, running, done, timed_out, error] }
+        outcome: { type: string, enum: [delivered, withheld, no_work, regressed], nullable: true }
+        branch: { type: string, nullable: true }
+        refusal_reason: { type: string, nullable: true }
+        spec_check: { type: string, nullable: true }
+        cost_cents: { type: number }
+        started_at: { type: string, format: date-time, nullable: true }
+        finished_at: { type: string, format: date-time, nullable: true }
